@@ -38,7 +38,7 @@ function buildX402Body(config) {
         scheme: 'exact',
         network: 'base',
         asset: config.usdcContract,
-        maxAmountRequired: String(config.priceMicroUsdc),
+        amount: String(config.priceMicroUsdc),
         payTo: config.recipientAddress,
         maxTimeoutSeconds: 300,
         description: config.description,
@@ -58,6 +58,15 @@ function buildX402Body(config) {
         name: 'DepegGuard Signal API',
         description: 'Real-time stablecoin depeg signals with HEDGE / EXIT / STABLE classification',
         version: '1.0.0',
+        schema: {
+          type: 'object',
+          properties: {
+            signals:       { type: 'array' },
+            activeSignals: { type: 'array' },
+            topSignal:     { type: 'object' },
+            timestamp:     { type: 'string' },
+          },
+        },
         info: {
           input: {
             type: 'http',
@@ -94,7 +103,7 @@ async function settleWithFacilitator(facilitatorUrl, paymentHeader, config) {
       scheme: 'exact',
       network: 'base',
       asset: config.usdcContract,
-      maxAmountRequired: String(config.priceMicroUsdc),
+      amount: String(config.priceMicroUsdc),
       payTo: config.recipientAddress,
       resource: `${config.serverUrl}/api/signal`,
     },
