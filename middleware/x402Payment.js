@@ -36,7 +36,7 @@ function buildX402Body(config) {
     accepts: [
       {
         scheme: 'exact',
-        network: 'base',
+        network: 'eip155:8453',
         asset: config.usdcContract,
         amount: String(config.priceMicroUsdc),
         payTo: config.recipientAddress,
@@ -97,7 +97,7 @@ async function settleWithFacilitator(facilitatorUrl, paymentHeader, config) {
   const body = {
     x402Version: 2,
     scheme: paymentObj.scheme ?? 'exact',
-    network: paymentObj.network ?? 'base',
+    network: paymentObj.network ?? 'eip155:8453',
     payload: paymentObj.payload,
     paymentRequirements: {
       scheme: 'exact',
@@ -175,7 +175,7 @@ function x402Middleware(config) {
       JSON.stringify({
         success: true,
         txHash: result.txHash,
-        network: 'base',
+        network: 'eip155:8453',
         amountSettled: String(config.priceMicroUsdc),
         asset: config.usdcContract,
       })
