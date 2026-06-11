@@ -4,35 +4,80 @@ const PAYMENT_REQUIRED_HEADER = 'payment-required';
 const PAYMENT_SIGNATURE_HEADER = 'payment-signature';
 const PAYMENT_RESPONSE_HEADER = 'payment-response';
 
+// Example response used in the bazaar output descriptor
+const SIGNAL_EXAMPLE = {
+  fetchedAt: '2025-01-15T12:00:00.000Z',
+  summary: {
+    EXIT:    [],
+    HEDGE:   ['FRAX'],
+    STABLE:  ['USDT', 'USDC', 'DAI', 'LUSD', 'DOLA', 'PYUSD'],
+    UNKNOWN: [],
+  },
+  signals: {
+    USDT:  { symbol: 'USDT',  signal: 'STABLE', price: 1.0001, pegDeviation:  0.01, status: 'stable' },
+    USDC:  { symbol: 'USDC',  signal: 'STABLE', price: 1.0000, pegDeviation:  0.00, status: 'stable' },
+    DAI:   { symbol: 'DAI',   signal: 'STABLE', price: 0.9998, pegDeviation:  0.02, status: 'stable' },
+    FRAX:  { symbol: 'FRAX',  signal: 'HEDGE',  price: 0.9942, pegDeviation:  0.58, status: 'at-risk' },
+    LUSD:  { symbol: 'LUSD',  signal: 'STABLE', price: 1.0003, pegDeviation:  0.03, status: 'stable' },
+    DOLA:  { symbol: 'DOLA',  signal: 'STABLE', price: 0.9997, pegDeviation:  0.03, status: 'stable' },
+    PYUSD: { symbol: 'PYUSD', signal: 'STABLE', price: 1.0001, pegDeviation:  0.01, status: 'stable' },
+  },
+};
+
 /**
- * Builds the payment requirements object served in the PAYMENT-REQUIRED header.
- * Encodes as base64 JSON per x402 V2 spec.
+ * Builds the canonical x402 V2 payment-required body.
+ * Also used (base64-encoded) as the PAYMENT-REQUIRED header value.
  */
-function buildPaymentRequired(config, req) {
-  const resource = `${config.serverUrl}${req.path}`;
-  const requirements = {
-    version: 2,
-    scheme: 'exact',
-    networkId: config.networkId,
-    asset: config.usdcContract,
-    maxAmountRequired: String(config.priceMicroUsdc),
-    payTo: config.recipientAddress,
-    maxTimeoutSeconds: 300,
-    description: config.description,
-    resource,
-    extra: {
-      name: 'USDC',
-      decimals: 6,
+function buildX402Body(config) {
+  const resourceUrl = `${config.serverUrl}/api/signal`;
+
+  return {
+    x402Version: 2,
+    accepts: [
+      {
+        scheme: 'exact',
+        network: 'base',
+        asset: config.usdcContract,
+        maxAmountRequired: String(config.priceMicroUsdc),
+        payTo: config.recipientAddress,
+        maxTimeoutSeconds: 300,
+        description: config.description,
+        extra: {
+          name: 'USD Coin',
+          version: '2',
+        },
+      },
+    ],
+    resource: {
+      url: resourceUrl,
+      description: 'Stablecoin depeg risk signals for USDT, USDC, DAI, FRAX, LUSD, DOLA, PYUSD',
+      mimeType: 'application/json',
+    },
+    extensions: {
+      bazaar: {
+        name: 'DepegGuard Signal API',
+        description: 'Real-time stablecoin depeg signals with HEDGE / EXIT / STABLE classification',
+        version: '1.0.0',
+        info: {
+          input: {
+            type: 'http',
+            method: 'GET',
+          },
+          output: {
+            type: 'json',
+            example: SIGNAL_EXAMPLE,
+          },
+        },
+      },
     },
   };
-  return Buffer.from(JSON.stringify(requirements)).toString('base64');
 }
 
 /**
  * Calls the x402 facilitator to settle (verify + submit on-chain) a payment.
  * Returns { success, txHash, error }.
  */
-async function settleWithFacilitator(facilitatorUrl, paymentHeader, config, req) {
+async function settleWithFacilitator(facilitatorUrl, paymentHeader, config) {
   let paymentObj;
   try {
     paymentObj = JSON.parse(Buffer.from(paymentHeader, 'base64').toString('utf8'));
@@ -40,20 +85,18 @@ async function settleWithFacilitator(facilitatorUrl, paymentHeader, config, req)
     return { success: false, error: 'Malformed PAYMENT-SIGNATURE: not valid base64 JSON' };
   }
 
-  const resource = `${config.serverUrl}${req.path}`;
-
   const body = {
     x402Version: 2,
     scheme: paymentObj.scheme ?? 'exact',
-    networkId: paymentObj.networkId ?? config.networkId,
+    network: paymentObj.network ?? 'base',
     payload: paymentObj.payload,
     paymentRequirements: {
-      maxAmountRequired: String(config.priceMicroUsdc),
-      asset: config.usdcContract,
-      payTo: config.recipientAddress,
-      networkId: config.networkId,
       scheme: 'exact',
-      resource,
+      network: 'base',
+      asset: config.usdcContract,
+      maxAmountRequired: String(config.priceMicroUsdc),
+      payTo: config.recipientAddress,
+      resource: `${config.serverUrl}/api/signal`,
     },
   };
 
@@ -82,39 +125,39 @@ async function settleWithFacilitator(facilitatorUrl, paymentHeader, config, req)
  *
  * config = {
  *   recipientAddress, usdcContract, priceMicroUsdc,
- *   networkId, serverUrl, facilitatorUrl, description
+ *   serverUrl, facilitatorUrl, description
  * }
  */
 function x402Middleware(config) {
+  // Build once at startup; body is static for this server's lifetime
+  const x402Body = buildX402Body(config);
+  const paymentRequiredHeader = Buffer.from(JSON.stringify(x402Body)).toString('base64');
+
   return async function (req, res, next) {
     const paymentSignature = req.headers[PAYMENT_SIGNATURE_HEADER];
 
     if (!paymentSignature) {
-      const paymentRequired = buildPaymentRequired(config, req);
       res.status(402)
-        .set(PAYMENT_REQUIRED_HEADER, paymentRequired)
-        .json({
-          error: 'Payment required',
-          description: `This endpoint costs $0.001 USDC on Base. Include a signed payment in the ${PAYMENT_SIGNATURE_HEADER.toUpperCase()} header.`,
-          paymentRequired: JSON.parse(Buffer.from(paymentRequired, 'base64').toString('utf8')),
-        });
+        .set(PAYMENT_REQUIRED_HEADER, paymentRequiredHeader)
+        .json(x402Body);
       return;
     }
 
     const result = await settleWithFacilitator(
       config.facilitatorUrl,
       paymentSignature,
-      config,
-      req
+      config
     );
 
     if (!result.success) {
-      const paymentRequired = buildPaymentRequired(config, req);
       res.status(402)
-        .set(PAYMENT_REQUIRED_HEADER, paymentRequired)
+        .set(PAYMENT_REQUIRED_HEADER, paymentRequiredHeader)
         .json({
+          x402Version: 2,
           error: 'Payment verification failed',
           reason: result.error,
+          accepts: x402Body.accepts,
+          resource: x402Body.resource,
         });
       return;
     }
@@ -123,7 +166,7 @@ function x402Middleware(config) {
       JSON.stringify({
         success: true,
         txHash: result.txHash,
-        networkId: config.networkId,
+        network: 'base',
         amountSettled: String(config.priceMicroUsdc),
         asset: config.usdcContract,
       })

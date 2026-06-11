@@ -19,7 +19,6 @@ const paymentConfig = {
   recipientAddress: process.env.RECIPIENT_ADDRESS || '0xcBB1AD132bB51Cc41210309d6e3bd45598eebb5e',
   usdcContract:     process.env.USDC_CONTRACT     || '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
   priceMicroUsdc:   Number(process.env.PRICE_MICRO_USDC) || 1000, // 0.001 USDC
-  networkId:        'base',
   serverUrl:        process.env.SERVER_URL || `http://localhost:${PORT}`,
   facilitatorUrl:   process.env.FACILITATOR_URL || 'https://x402.org/facilitator',
   description:      'PegCheck depeg signal — USDT, USDC, DAI, FRAX, LUSD, DOLA, PYUSD',
