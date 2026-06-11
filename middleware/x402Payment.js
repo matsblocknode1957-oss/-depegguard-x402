@@ -96,15 +96,16 @@ async function settleWithFacilitator(facilitatorUrl, paymentHeader, config) {
 
   const body = {
     x402Version: 2,
-    scheme: paymentObj.scheme ?? 'exact',
-    network: paymentObj.network ?? 'eip155:8453',
-    payload: paymentObj.payload,
+    paymentPayload: paymentObj,
     paymentRequirements: {
       scheme: 'exact',
-      network: 'base',
+      network: 'eip155:8453',
       asset: config.usdcContract,
       amount: String(config.priceMicroUsdc),
       payTo: config.recipientAddress,
+      maxTimeoutSeconds: 300,
+      description: config.description,
+      extra: { name: 'USD Coin', version: '2' },
       resource: `${config.serverUrl}/api/signal`,
     },
   };
