@@ -5,6 +5,43 @@ $0.001 USDC per call. Covers USDT, USDC, DAI, FRAX, LUSD, DOLA, PYUSD.
 
 ---
 
+## Live Deployment
+
+**Production URL:** `https://depegguard-x402-production.up.railway.app`
+
+Deployed on Base mainnet. Validated on [Agentic.Market](https://agentic.market/validate) — all checks pass, x402 V2 compliant with Bazaar schema extension.
+
+**Payment settlement wallet:** `0xcBB1AD132bB51Cc41210309d6e3bd45598eebb5e`
+
+> **Note on facilitators:** The public `x402.org` facilitator only supports testnets (Base Sepolia `eip155:84532`). For real mainnet settlement, a self-hosted facilitator (`@x402/evm/exact/facilitator`) pointed at Base mainnet is required. This deployment uses such a facilitator.
+
+### Live curl examples
+
+```bash
+# Discover service info (free)
+curl https://depegguard-x402-production.up.railway.app/
+
+# Discover catalog and pricing (free)
+curl https://depegguard-x402-production.up.railway.app/api/catalog
+
+# Trigger 402 Payment Required
+curl -i https://depegguard-x402-production.up.railway.app/api/signal
+
+# Inspect the PAYMENT-REQUIRED header
+PAYMENT_REQUIRED=$(curl -si https://depegguard-x402-production.up.railway.app/api/signal \
+  | grep -i '^payment-required:' \
+  | awk '{print $2}' \
+  | tr -d '\r')
+
+echo "$PAYMENT_REQUIRED" | base64 -d | python3 -m json.tool
+
+# Call /api/signal with a signed payment
+curl -i https://depegguard-x402-production.up.railway.app/api/signal \
+  -H "payment-signature: $SIGNED_PAYMENT"
+```
+
+---
+
 ## Quick start
 
 ```bash
