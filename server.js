@@ -3,6 +3,7 @@
 require('dotenv').config();
 
 const express = require('express');
+const { randomUUID } = require('crypto');
 const { requirePayment } = require('@piprail/sdk');
 
 const app = express();
@@ -26,6 +27,8 @@ app.use('/api/signal', requirePayment({
   rpcUrl:             process.env.BASE_RPC_URL,
   minConfirmations:   1,
   description:        'PegCheck depeg signal — USDT, USDC, DAI, FRAX, LUSD, DOLA, PYUSD',
+  // globalThis.crypto is absent on Node 18 in some environments (stable only in Node 19+)
+  generateNonce:      () => randomUUID(),
 }));
 
 // ── Paid endpoint ─────────────────────────────────────────────────────────────
