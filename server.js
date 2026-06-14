@@ -19,7 +19,7 @@ app.get('/api/catalog', require('./routes/catalog'));
 //   onchain-proof → piprail + Base RPC   (real mainnet settlement)
 app.use('/api/signal', dualSchemePayment({
   recipientAddress: process.env.RECIPIENT_ADDRESS || '0xcBB1AD132bB51Cc41210309d6e3bd45598eebb5e',
-  usdcContract:     process.env.USDC_CONTRACT     || '0x833589fCD6eDb6E08f4c7C32C4f2e608d57336B3',
+  usdcContract:     process.env.USDC_CONTRACT     || '0x833589fcd6EDB6e08f4C7C32C4f2E608D57336b3',
   serverUrl:        process.env.SERVER_URL         || `http://localhost:${PORT}`,
   facilitatorUrl:   process.env.FACILITATOR_URL   || 'https://www.x402.org/facilitator',
   description:      'PegCheck depeg signal — USDT, USDC, DAI, FRAX, LUSD, DOLA, PYUSD',
