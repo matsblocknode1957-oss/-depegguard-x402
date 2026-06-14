@@ -99,7 +99,7 @@ Client                              Server
     {
       "scheme": "onchain-proof",
       "network": "eip155:8453",
-      "asset": "0x833589fcd6EDB6e08f4C7C32C4f2E608D57336b3",
+      "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
       "amount": "1000",
       "payTo": "0xcBB1AD132bB51Cc41210309d6e3bd45598eebb5e",
       "maxTimeoutSeconds": 600,

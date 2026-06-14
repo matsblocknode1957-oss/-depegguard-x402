@@ -46,7 +46,7 @@ function catalogHandler(req, res) {
         priceRaw: '1000',
         priceCurrency: 'USDC',
         priceDecimals: 6,
-        asset: process.env.USDC_CONTRACT || '0x833589fcd6EDB6e08f4C7C32C4f2E608D57336b3',
+        asset: process.env.USDC_CONTRACT || '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
         network: 'base',
         chainId: 8453,
         recipient: process.env.RECIPIENT_ADDRESS || '0xcBB1AD132bB51Cc41210309d6e3bd45598eebb5e',

@@ -5,7 +5,7 @@ const { createPaymentGate } = require('@piprail/sdk');
 
 // Canonical Base USDC — EIP-55 checksummed, verified via viem getAddress().
 // Hardcoded so the 402 challenge is always correct regardless of env var capitalisation.
-const BASE_USDC = '0x833589fcd6EDB6e08f4C7C32C4f2E608D57336b3';
+const BASE_USDC = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 
 const PAYMENT_REQUIRED_HEADER = 'payment-required';
 const PAYMENT_SIGNATURE_HEADER = 'payment-signature';
