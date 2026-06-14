@@ -95,7 +95,7 @@ function dualSchemePayment(config) {
     amount:           '0.001',
     payTo:            config.recipientAddress,
     rpcUrl:           config.rpcUrl,
-    minConfirmations: 1,
+    minConfirmations: 0,
     description:      config.description,
     generateNonce:    () => randomUUID(),
   });
