@@ -3,8 +3,7 @@
 require('dotenv').config();
 
 const express = require('express');
-const { randomUUID } = require('crypto');
-const { requirePayment } = require('@piprail/sdk');
+const { dualSchemePayment } = require('./middleware/dualSchemePayment');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -15,20 +14,16 @@ app.use(express.json());
 app.get('/', require('./routes/info'));
 app.get('/api/catalog', require('./routes/catalog'));
 
-// ── Piprail payment gate (on-chain verification via Base RPC) ─────────────────
-// piprail's built-in 'USDC' address for Base is wrong; override with the canonical contract
-const BASE_USDC = process.env.USDC_CONTRACT || '0x833589fCD6eDb6E08f4c7C32C4f2e608d57336B3';
-
-app.use('/api/signal', requirePayment({
-  chain:              'base',
-  token:              { address: BASE_USDC, decimals: 6 },
-  amount:             '0.001',
-  payTo:              process.env.RECIPIENT_ADDRESS || '0xcBB1AD132bB51Cc41210309d6e3bd45598eebb5e',
-  rpcUrl:             process.env.BASE_RPC_URL,
-  minConfirmations:   1,
-  description:        'PegCheck depeg signal — USDT, USDC, DAI, FRAX, LUSD, DOLA, PYUSD',
-  // globalThis.crypto is absent on Node 18 in some environments (stable only in Node 19+)
-  generateNonce:      () => randomUUID(),
+// ── Dual-scheme payment gate ──────────────────────────────────────────────────
+//   exact        → x402.org facilitator  (Agentic.Market/Bazaar discovery)
+//   onchain-proof → piprail + Base RPC   (real mainnet settlement)
+app.use('/api/signal', dualSchemePayment({
+  recipientAddress: process.env.RECIPIENT_ADDRESS || '0xcBB1AD132bB51Cc41210309d6e3bd45598eebb5e',
+  usdcContract:     process.env.USDC_CONTRACT     || '0x833589fCD6eDb6E08f4c7C32C4f2e608d57336B3',
+  serverUrl:        process.env.SERVER_URL         || `http://localhost:${PORT}`,
+  facilitatorUrl:   process.env.FACILITATOR_URL   || 'https://www.x402.org/facilitator',
+  description:      'PegCheck depeg signal — USDT, USDC, DAI, FRAX, LUSD, DOLA, PYUSD',
+  rpcUrl:           process.env.BASE_RPC_URL,
 }));
 
 // ── Paid endpoint ─────────────────────────────────────────────────────────────
@@ -43,5 +38,5 @@ app.use((err, req, res, _next) => {
 app.listen(PORT, () => {
   console.log(`DepegGuard x402 server  →  http://localhost:${PORT}`);
   console.log(`  Free :  GET /           GET /api/catalog`);
-  console.log(`  Paid :  GET /api/signal  ($0.001 USDC via piprail on Base mainnet)`);
+  console.log(`  Paid :  GET /api/signal  ($0.001 USDC — exact or onchain-proof on Base)`);
 });
