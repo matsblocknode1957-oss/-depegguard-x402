@@ -1,5 +1,24 @@
 'use strict';
 
+const SIGNAL_EXAMPLE = {
+  fetchedAt: '2025-01-15T12:00:00.000Z',
+  summary: {
+    EXIT:    [],
+    HEDGE:   ['FRAX'],
+    STABLE:  ['USDT', 'USDC', 'DAI', 'LUSD', 'DOLA', 'PYUSD'],
+    UNKNOWN: [],
+  },
+  signals: {
+    USDT:  { symbol: 'USDT',  signal: 'STABLE', price: 1.0001, pegDeviation:  0.01, status: 'stable' },
+    USDC:  { symbol: 'USDC',  signal: 'STABLE', price: 1.0000, pegDeviation:  0.00, status: 'stable' },
+    DAI:   { symbol: 'DAI',   signal: 'STABLE', price: 0.9998, pegDeviation:  0.02, status: 'stable' },
+    FRAX:  { symbol: 'FRAX',  signal: 'HEDGE',  price: 0.9942, pegDeviation:  0.58, status: 'at-risk' },
+    LUSD:  { symbol: 'LUSD',  signal: 'STABLE', price: 1.0003, pegDeviation:  0.03, status: 'stable' },
+    DOLA:  { symbol: 'DOLA',  signal: 'STABLE', price: 0.9997, pegDeviation:  0.03, status: 'stable' },
+    PYUSD: { symbol: 'PYUSD', signal: 'STABLE', price: 1.0001, pegDeviation:  0.01, status: 'stable' },
+  },
+};
+
 function catalogHandler(req, res) {
   const serverUrl = process.env.SERVER_URL || `http://localhost:${process.env.PORT || 3001}`;
 
@@ -27,7 +46,7 @@ function catalogHandler(req, res) {
         priceRaw: '1000',
         priceCurrency: 'USDC',
         priceDecimals: 6,
-        asset: process.env.USDC_CONTRACT || '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+        asset: process.env.USDC_CONTRACT || '0x833589fCD6eDb6E08f4c7C32C4f2e608d57336B3',
         network: 'base',
         chainId: 8453,
         recipient: process.env.RECIPIENT_ADDRESS || '0xcBB1AD132bB51Cc41210309d6e3bd45598eebb5e',
@@ -51,13 +70,15 @@ function catalogHandler(req, res) {
             },
           },
         },
+        responseExample: SIGNAL_EXAMPLE,
       },
     ],
     paymentFlow: {
-      step1: `Call ${serverUrl}/api/signal without payment headers → receive 402 with PAYMENT-REQUIRED header`,
-      step2: 'Parse base64-decoded PAYMENT-REQUIRED JSON; sign an EIP-3009 transferWithAuthorization for the given amount/recipient',
-      step3: 'Encode the signed payment as base64 JSON and include it in the PAYMENT-SIGNATURE header',
-      step4: 'Receive 200 with signal data; PAYMENT-RESPONSE header contains settlement confirmation',
+      step1: `Call ${serverUrl}/api/signal without payment headers → receive 402 with x402 challenge`,
+      step2: 'Parse the challenge; send 0.001 USDC to the recipient address on Base mainnet (on-chain transfer)',
+      step3: 'Encode the transaction hash as a piprail proof and include it in the payment-signature header',
+      step4: 'Receive 200 with signal data; payment-response header contains the verified receipt',
+      client: 'Use PipRailClient from @piprail/sdk — it handles steps 2–4 automatically',
     },
   });
 }
