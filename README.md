@@ -259,3 +259,10 @@ Copy `.env.example` to `.env` and adjust:
 │    classify() → STABLE / HEDGE / EXIT per coin              │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Known limitations
+
+**`resource.url` is empty in the 402 challenge.**  
+`requirePayment` from `@piprail/sdk` always emits `"resource": { "url": "" }` — its Express wrapper calls `makeChallenge("")` unconditionally and never reads `req.url`, `req.hostname`, or `SERVER_URL`. The `accepts` block (which clients actually parse for payment routing) is fully correct; `resource.url` is informational metadata only and does not affect payment verification.
