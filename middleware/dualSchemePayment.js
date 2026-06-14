@@ -1,8 +1,11 @@
 'use strict';
 
 const { randomUUID } = require('crypto');
-const { getAddress } = require('viem');
 const { createPaymentGate } = require('@piprail/sdk');
+
+// Canonical Base USDC — EIP-55 checksummed, verified via viem getAddress().
+// Hardcoded so the 402 challenge is always correct regardless of env var capitalisation.
+const BASE_USDC = '0x833589fcd6EDB6e08f4C7C32C4f2E608D57336b3';
 
 const PAYMENT_REQUIRED_HEADER = 'payment-required';
 const PAYMENT_SIGNATURE_HEADER = 'payment-signature';
@@ -73,14 +76,11 @@ function toBase64(obj) {
  */
 function dualSchemePayment(config) {
   const resourceUrl = `${config.serverUrl}/api/signal`;
-  // Normalise to correct EIP-55 checksum so viem never rejects the address,
-  // regardless of what capitalisation the env var was set with.
-  const usdcAddress = getAddress(config.usdcContract);
 
   const exactAccept = {
     scheme: 'exact',
     network: 'eip155:8453',
-    asset: usdcAddress,
+    asset: BASE_USDC,
     amount: '1000',
     payTo: config.recipientAddress,
     maxTimeoutSeconds: 300,
@@ -91,7 +91,7 @@ function dualSchemePayment(config) {
   // Piprail gate — only used for onchain-proof verification via Base RPC
   const gate = createPaymentGate({
     chain:            'base',
-    token:            { address: usdcAddress, decimals: 6 },
+    token:            { address: BASE_USDC, decimals: 6 },
     amount:           '0.001',
     payTo:            config.recipientAddress,
     rpcUrl:           config.rpcUrl,
@@ -126,7 +126,7 @@ function dualSchemePayment(config) {
       paymentRequirements: {
         scheme: 'exact',
         network: 'eip155:8453',
-        asset: usdcAddress,
+        asset: BASE_USDC,
         amount: '1000',
         payTo: config.recipientAddress,
         maxTimeoutSeconds: 300,
@@ -193,7 +193,7 @@ function dualSchemePayment(config) {
           txHash: result.txHash,
           network: 'eip155:8453',
           amountSettled: '1000',
-          asset: usdcAddress,
+          asset: BASE_USDC,
         }));
         return next();
       }
