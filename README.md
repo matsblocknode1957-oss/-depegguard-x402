@@ -7,6 +7,12 @@ Payment verification is handled by [`@piprail/sdk`](https://www.npmjs.com/packag
 
 ---
 
+## Status
+
+**Live and verified.** Dual-scheme payment gate (exact + onchain-proof) is active on Base mainnet. Validated via Agentic.Market/Bazaar — all checks pass. 3 real on-chain USDC payments completed end-to-end.
+
+---
+
 ## Live Deployment
 
 **Production URL:** `https://depegguard-x402-production.up.railway.app`
