@@ -39,4 +39,8 @@ app.listen(PORT, () => {
   console.log(`DepegGuard x402 server  →  http://localhost:${PORT}`);
   console.log(`  Free :  GET /           GET /api/catalog`);
   console.log(`  Paid :  GET /api/signal  ($0.001 USDC — exact or onchain-proof on Base)`);
+
+  require('./croo-provider').init().catch((err) => {
+    console.error('[croo] provider failed to start:', err.message);
+  });
 });
