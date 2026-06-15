@@ -19,9 +19,9 @@ app.get('/api/catalog', require('./routes/catalog'));
 //   onchain-proof → piprail + Base RPC   (real mainnet settlement)
 app.use('/api/signal', dualSchemePayment({
   recipientAddress: process.env.RECIPIENT_ADDRESS || '0xcBB1AD132bB51Cc41210309d6e3bd45598eebb5e',
-  usdcContract:     process.env.USDC_CONTRACT     || '0x833589fcd6EDB6e08f4C7C32C4f2E608D57336b3',
+  usdcContract:     process.env.USDC_CONTRACT     || '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
   serverUrl:        process.env.SERVER_URL         || `http://localhost:${PORT}`,
-  facilitatorUrl:   process.env.FACILITATOR_URL   || 'https://www.x402.org/facilitator',
+  facilitatorUrl:   process.env.FACILITATOR_URL   || 'https://api.cdp.coinbase.com/platform/v2/x402',
   description:      'PegCheck depeg signal — USDT, USDC, DAI, FRAX, LUSD, DOLA, PYUSD',
   rpcUrl:           process.env.BASE_RPC_URL,
 }));
