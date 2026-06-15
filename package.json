@@ -11,6 +11,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
+    "@croo-network/sdk": "^0.2.1",
     "@piprail/sdk": "^1.24.0",
     "@x402/evm": "^2.14.0",
     "@x402/fetch": "^2.14.0",
