@@ -3,54 +3,12 @@
 const { randomUUID } = require('crypto');
 const { createPaymentGate } = require('@piprail/sdk');
 
-// Canonical Base USDC — EIP-55 checksummed, verified via viem getAddress().
-// Hardcoded so the 402 challenge is always correct regardless of env var capitalisation.
 const BASE_USDC = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 
 const PAYMENT_REQUIRED_HEADER = 'payment-required';
 const PAYMENT_SIGNATURE_HEADER = 'payment-signature';
 const PAYMENT_RESPONSE_HEADER = 'payment-response';
 
-const SIGNAL_EXAMPLE = {
-  fetchedAt: '2025-01-15T12:00:00.000Z',
-  summary: {
-    EXIT:    [],
-    HEDGE:   ['FRAX'],
-    STABLE:  ['USDT', 'USDC', 'DAI', 'LUSD', 'DOLA', 'PYUSD'],
-    UNKNOWN: [],
-  },
-  signals: {
-    USDT:  { symbol: 'USDT',  signal: 'STABLE', price: 1.0001, pegDeviation: 0.01, status: 'stable' },
-    USDC:  { symbol: 'USDC',  signal: 'STABLE', price: 1.0000, pegDeviation: 0.00, status: 'stable' },
-    DAI:   { symbol: 'DAI',   signal: 'STABLE', price: 0.9998, pegDeviation: 0.02, status: 'stable' },
-    FRAX:  { symbol: 'FRAX',  signal: 'HEDGE',  price: 0.9942, pegDeviation: 0.58, status: 'at-risk' },
-    LUSD:  { symbol: 'LUSD',  signal: 'STABLE', price: 1.0003, pegDeviation: 0.03, status: 'stable' },
-    DOLA:  { symbol: 'DOLA',  signal: 'STABLE', price: 0.9997, pegDeviation: 0.03, status: 'stable' },
-    PYUSD: { symbol: 'PYUSD', signal: 'STABLE', price: 1.0001, pegDeviation: 0.01, status: 'stable' },
-  },
-};
-
-const BAZAAR_EXTENSION = {
-  name: 'DepegGuard Signal API',
-  description: 'Real-time stablecoin depeg signals with HEDGE / EXIT / STABLE classification',
-  version: '1.0.0',
-  schema: {
-    type: 'object',
-    properties: {
-      signals:       { type: 'array' },
-      activeSignals: { type: 'array' },
-      topSignal:     { type: 'object' },
-      timestamp:     { type: 'string' },
-    },
-  },
-  info: {
-    input:  { type: 'http', method: 'GET' },
-    output: { type: 'json', example: SIGNAL_EXAMPLE },
-  },
-};
-
-// Decode scheme from a base64-encoded payment-signature header.
-// Returns 'exact' | 'onchain-proof' | null.
 function detectScheme(header) {
   try {
     const obj = JSON.parse(Buffer.from(header, 'base64').toString('utf8'));
@@ -65,34 +23,49 @@ function toBase64(obj) {
 }
 
 /**
- * Factory returning Express middleware that advertises both the x402 `exact`
- * scheme (for Agentic.Market/Bazaar discovery) and piprail's `onchain-proof`
- * scheme (for real Base mainnet settlement).
- *
  * config = {
- *   recipientAddress, usdcContract, serverUrl,
- *   facilitatorUrl, description, rpcUrl
+ *   recipientAddress, usdcContract, serverUrl, facilitatorUrl, rpcUrl,
+ *   resourcePath,   // e.g. '/api/signal'
+ *   amountMicro,    // USDC in base units (6 decimals), e.g. '1000' = $0.001
+ *   description,
  * }
  */
 function dualSchemePayment(config) {
-  const resourceUrl = `${config.serverUrl}/api/signal`;
+  const resourceUrl = `${config.serverUrl}${config.resourcePath}`;
+  const amountDecimal = String(parseInt(config.amountMicro, 10) / 1_000_000);
+
+  const bazaarExtension = {
+    name: config.description,
+    description: config.description,
+    version: '1.0.0',
+    schema: {
+      type: 'object',
+      properties: {
+        fetchedAt: { type: 'string' },
+        data:      { type: 'object' },
+      },
+    },
+    info: {
+      input:  { type: 'http', method: 'GET' },
+      output: { type: 'json' },
+    },
+  };
 
   const exactAccept = {
     scheme: 'exact',
     network: 'eip155:8453',
     asset: BASE_USDC,
-    amount: '1000',
+    amount: config.amountMicro,
     payTo: config.recipientAddress,
     maxTimeoutSeconds: 300,
     description: config.description,
     extra: { name: 'USD Coin', version: '2' },
   };
 
-  // Piprail gate — only used for onchain-proof verification via Base RPC
   const gate = createPaymentGate({
     chain:            'base',
     token:            { address: BASE_USDC, decimals: 6 },
-    amount:           '0.001',
+    amount:           amountDecimal,
     payTo:            config.recipientAddress,
     rpcUrl:           config.rpcUrl,
     minConfirmations: 0,
@@ -100,18 +73,16 @@ function dualSchemePayment(config) {
     generateNonce:    () => randomUUID(),
   });
 
-  // Build the 402 body fresh per request (onchain-proof nonce must be unique).
   async function build402Body() {
     const { challenge } = await gate.challenge(resourceUrl);
     return {
       x402Version: 2,
-      resource: challenge.resource,          // url + description, now correctly populated
-      accepts:  [exactAccept, ...challenge.accepts], // exact first for Agentic.Market, then onchain-proof
-      extensions: { bazaar: BAZAAR_EXTENSION },
+      resource: challenge.resource,
+      accepts:  [exactAccept, ...challenge.accepts],
+      extensions: { bazaar: bazaarExtension },
     };
   }
 
-  // Settle an exact-scheme proof via the x402 facilitator.
   async function settleExact(header) {
     let paymentObj;
     try {
@@ -127,7 +98,7 @@ function dualSchemePayment(config) {
         scheme: 'exact',
         network: 'eip155:8453',
         asset: BASE_USDC,
-        amount: '1000',
+        amount: config.amountMicro,
         payTo: config.recipientAddress,
         maxTimeoutSeconds: 300,
         description: config.description,
@@ -192,7 +163,7 @@ function dualSchemePayment(config) {
           success: true,
           txHash: result.txHash,
           network: 'eip155:8453',
-          amountSettled: '1000',
+          amountSettled: config.amountMicro,
           asset: BASE_USDC,
         }));
         return next();

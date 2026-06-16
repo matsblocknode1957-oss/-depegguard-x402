@@ -1,0 +1,32 @@
+'use strict';
+
+const FINTECHCHECK = process.env.FINTECHCHECK_URL
+  || 'https://fintechcheck-production.up.railway.app';
+
+function riskLevel(composite) {
+  if (composite >= 75) return 'CRITICAL';
+  if (composite >= 50) return 'HIGH';
+  if (composite >= 25) return 'MODERATE';
+  return 'LOW';
+}
+
+async function correlatedRiskHandler(req, res) {
+  const response = await fetch(`${FINTECHCHECK}/api/risk`, { signal: AbortSignal.timeout(8_000) });
+  if (!response.ok) throw new Error(`FintechCheck returned ${response.status}`);
+  const data = await response.json();
+
+  res.json({
+    fetchedAt: new Date().toISOString(),
+    composite: data.composite,
+    corrScore: data.corrScore,
+    riskLevel: riskLevel(data.composite ?? 0),
+    correlatedCoins: data.correlatedCoins || [],
+    pegStress: data.pegStress,
+    liquidationStress: data.liquidationStress,
+    flowPressure: data.flowPressure,
+    perCoin: data.perCoin || {},
+    dataTimestamp: new Date(data.timestamp).toISOString(),
+  });
+}
+
+module.exports = correlatedRiskHandler;

@@ -14,20 +14,82 @@ app.use(express.json());
 app.get('/', require('./routes/info'));
 app.get('/api/catalog', require('./routes/catalog'));
 
-// ── Dual-scheme payment gate ──────────────────────────────────────────────────
-//   exact        → x402.org facilitator  (Agentic.Market/Bazaar discovery)
-//   onchain-proof → piprail + Base RPC   (real mainnet settlement)
-app.use('/api/signal', dualSchemePayment({
+// ── Paid route registry ───────────────────────────────────────────────────────
+const sharedConfig = {
   recipientAddress: process.env.RECIPIENT_ADDRESS || '0xcBB1AD132bB51Cc41210309d6e3bd45598eebb5e',
   usdcContract:     process.env.USDC_CONTRACT     || '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
   serverUrl:        process.env.SERVER_URL         || `http://localhost:${PORT}`,
   facilitatorUrl:   process.env.FACILITATOR_URL   || 'https://api.cdp.coinbase.com/platform/v2/x402',
-  description:      'PegCheck depeg signal — USDT, USDC, DAI, FRAX, LUSD, DOLA, PYUSD',
   rpcUrl:           process.env.BASE_RPC_URL,
-}));
+};
 
-// ── Paid endpoint ─────────────────────────────────────────────────────────────
-app.get('/api/signal', require('./routes/signal'));
+const PAID_ROUTES = [
+  {
+    resourcePath: '/api/signal',
+    amountMicro:  '1000',
+    description:  'Depeg signals for USDT, USDC, DAI, FRAX, LUSD, DOLA, PYUSD',
+    handler:      require('./routes/signal'),
+  },
+  {
+    resourcePath: '/api/signal/coin',
+    amountMicro:  '50000',
+    description:  'Single-coin depeg signal — specify ?coin=USDC',
+    handler:      require('./routes/signal-coin'),
+  },
+  {
+    resourcePath: '/api/health-index',
+    amountMicro:  '50000',
+    description:  'Stablecoin Health Index score (0–100) across all monitored coins',
+    handler:      require('./routes/health-index'),
+  },
+  {
+    resourcePath: '/api/fear-greed',
+    amountMicro:  '50000',
+    description:  'Crypto Fear & Greed Index (0–100) from Alternative.me',
+    handler:      require('./routes/fear-greed'),
+  },
+  {
+    resourcePath: '/api/history',
+    amountMicro:  '50000',
+    description:  'Depeg history for a coin — ?coin=USDC&days=7 (max 30)',
+    handler:      require('./routes/history'),
+  },
+  {
+    resourcePath: '/api/whales',
+    amountMicro:  '100000',
+    description:  'Whale stablecoin transfers >$1M in the last hour',
+    handler:      require('./routes/whales'),
+  },
+  {
+    resourcePath: '/api/collateral',
+    amountMicro:  '100000',
+    description:  'Aave V3 collateral ratio and health factor — ?address=0x…',
+    handler:      require('./routes/collateral'),
+  },
+  {
+    resourcePath: '/api/liquidation-risk',
+    amountMicro:  '100000',
+    description:  'Protocol liquidation stress score — ?protocol=aave-v3',
+    handler:      require('./routes/liquidation-risk'),
+  },
+  {
+    resourcePath: '/api/tvl-risk',
+    amountMicro:  '100000',
+    description:  'Protocol TVL and 24h risk assessment — ?protocol=aave-v3',
+    handler:      require('./routes/tvl-risk'),
+  },
+  {
+    resourcePath: '/api/correlated-risk',
+    amountMicro:  '100000',
+    description:  'Correlated stablecoin risk score from FintechCheck Risk Engine',
+    handler:      require('./routes/correlated-risk'),
+  },
+];
+
+for (const route of PAID_ROUTES) {
+  app.use(route.resourcePath, dualSchemePayment({ ...sharedConfig, ...route }));
+  app.get(route.resourcePath, route.handler);
+}
 
 // ── Global error handler ──────────────────────────────────────────────────────
 app.use((err, req, res, _next) => {
@@ -37,8 +99,8 @@ app.use((err, req, res, _next) => {
 
 app.listen(PORT, () => {
   console.log(`DepegGuard x402 server  →  http://localhost:${PORT}`);
-  console.log(`  Free :  GET /           GET /api/catalog`);
-  console.log(`  Paid :  GET /api/signal  ($0.001 USDC — exact or onchain-proof on Base)`);
+  console.log(`  Free :  GET /   GET /api/catalog`);
+  console.log(`  Paid :  ${PAID_ROUTES.map((r) => r.resourcePath).join('  ')}`);
 
   require('./croo-provider').init().catch((err) => {
     console.error('[croo] provider failed to start:', err.message);
