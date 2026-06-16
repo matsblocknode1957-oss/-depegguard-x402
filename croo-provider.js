@@ -6,26 +6,19 @@ const { COINS, PEGCHECK_HISTORY, fetchCoin } = require('./lib/pegcheck');
 const FINTECHCHECK = process.env.FINTECHCHECK_URL
   || 'https://fintechcheck-production.up.railway.app';
 
-// ── Service ID registry ───────────────────────────────────────────────────────
-// These must match the service IDs assigned by the CROO marketplace after
-// registration. Override via env vars once your services are live.
-const SERVICE_IDS = {
-  signal:          process.env.CROO_SVC_SIGNAL           || 'depeg-signal',
-  signalCoin:      process.env.CROO_SVC_SIGNAL_COIN      || 'depeg-signal-coin',
-  healthIndex:     process.env.CROO_SVC_HEALTH_INDEX     || 'health-index',
-  fearGreed:       process.env.CROO_SVC_FEAR_GREED       || 'fear-greed',
-  history:         process.env.CROO_SVC_HISTORY          || 'depeg-history',
-  whales:          process.env.CROO_SVC_WHALES           || 'whale-transfers',
-  collateral:      process.env.CROO_SVC_COLLATERAL       || 'collateral-ratio',
-  liquidationRisk: process.env.CROO_SVC_LIQUIDATION_RISK || 'liquidation-risk',
-  tvlRisk:         process.env.CROO_SVC_TVL_RISK         || 'tvl-risk',
-  correlatedRisk:  process.env.CROO_SVC_CORRELATED_RISK  || 'correlated-risk',
+// ── Service ID → handler key ──────────────────────────────────────────────────
+const ID_TO_KEY = {
+  '54931089-096a-43b1-812a-ebdc412c58d1': 'signal',
+  '187217b4-1a33-414d-bfd9-e70ec3eafebb': 'signalCoin',
+  '7c96a4e6-958e-49ad-a0b6-e70acd7de1a9': 'healthIndex',
+  '738491a2-1220-4168-81fe-656d2ecf4f22': 'fearGreed',
+  'd835c881-be15-4993-b961-67efd099e538': 'history',
+  'd3d424de-c590-4316-8eb4-d9eb1fa1678d': 'whales',
+  'fe8670f6-608a-4e29-9de9-5f2af2b8c913': 'collateral',
+  'ef1da897-7208-4fe6-bb9a-8beaa9ad0ad6': 'liquidationRisk',
+  'e02583e5-01ca-43b7-bf88-b4071368ee0d': 'tvlRisk',
+  '5b38507a-df2c-45d1-b436-9a7d7dde586c': 'correlatedRisk',
 };
-
-// Reverse map: service_id string → handler key
-const ID_TO_KEY = Object.fromEntries(
-  Object.entries(SERVICE_IDS).map(([k, v]) => [v, k]),
-);
 
 // ── Payload builders ──────────────────────────────────────────────────────────
 
