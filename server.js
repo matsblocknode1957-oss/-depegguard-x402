@@ -174,6 +174,24 @@ const PAID_ROUTES = [
     description:  'Stablecoin supply velocity — mint/redeem rate as a risk signal — ?coin=USDC&days=30',
     handler:      require('./routes/velocity'),
   },
+  {
+    resourcePath: '/api/portfolio-report',
+    amountMicro:  '250000',
+    description:  'Full portfolio risk report across multiple wallets — ?addresses=0x1,0x2 (up to 5)',
+    handler:      require('./routes/portfolio-report'),
+  },
+  {
+    resourcePath: '/api/early-warning',
+    amountMicro:  '250000',
+    description:  'Depeg early warning signal — composite score 0–100, alert level GREEN/YELLOW/ORANGE/RED',
+    handler:      require('./routes/early-warning'),
+  },
+  {
+    resourcePath: '/api/ai-report',
+    amountMicro:  '1000000',
+    description:  'AI-generated DeFi risk advisory report via Claude — ?protocol=aave-v3 OR ?address=0x…',
+    handler:      require('./routes/ai-report'),
+  },
 ];
 
 for (const route of PAID_ROUTES) {

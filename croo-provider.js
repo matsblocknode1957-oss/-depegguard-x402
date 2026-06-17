@@ -37,6 +37,10 @@ const ID_TO_KEY_2 = {
   '6059ee21-276b-400e-af60-0cb82e73ef5b': 'tvlTrend',
   'bfab5bdd-63bf-4afc-b72e-00f05967c5ac': 'chainlinkPrice',
   '6aa7128f-a820-4be6-ba04-09fba5d27d3f': 'velocity',
+  // ── premium batch — replace with CROO marketplace UUIDs once registered ──
+  'CROO_UUID_PORTFOLIO_REPORT': 'portfolioReport',
+  'CROO_UUID_EARLY_WARNING':    'earlyWarning',
+  'CROO_UUID_AI_REPORT':        'aiReport',
 };
 
 // ── Payload builders ──────────────────────────────────────────────────────────
@@ -436,6 +440,9 @@ const BUILDERS = {
   tvlTrend:           (opts)  => buildFromRoute('./routes/tvl-trend',             opts),
   chainlinkPrice:     (opts)  => buildFromRoute('./routes/chainlink-price',       opts),
   velocity:           (opts)  => buildFromRoute('./routes/velocity',               opts),
+  portfolioReport:    (opts)  => buildFromRoute('./routes/portfolio-report',       opts),
+  earlyWarning:       (_opts) => buildFromRoute('./routes/early-warning',          {}),
+  aiReport:           (opts)  => buildFromRoute('./routes/ai-report',              opts),
 };
 
 // Services that read parameters from negotiation.requirements JSON
@@ -443,6 +450,7 @@ const PARAMETERIZED = new Set([
   'signalCoin', 'history', 'collateral', 'liquidationRisk', 'tvlRisk',
   'proofOfReserve', 'stressTest', 'walletMonitor', 'protocolRisk',
   'crossChainDepeg', 'liquidationPrice', 'tvlTrend', 'chainlinkPrice', 'velocity',
+  'portfolioReport', 'aiReport',
 ]);
 
 function parseRequirements(str) {

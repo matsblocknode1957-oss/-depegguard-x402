@@ -314,6 +314,47 @@ const PAID_ENDPOINTS = [
       note: 'string', history: 'array of { date, supplyUsd }',
     },
   },
+  {
+    path: '/api/portfolio-report',
+    price: '$0.25', priceRaw: '250000',
+    description: 'Full portfolio risk report — multi-wallet, multi-protocol (Aave v3, Compound v3, MakerDAO) with composite score',
+    params: [{ name: 'addresses', required: true, values: '0x…,0x… comma-separated (up to 5)' }],
+    responseSchema: {
+      fetchedAt: 'ISO-8601 timestamp',
+      portfolioRiskScore: 'number 0–100', riskLevel: 'CRITICAL|HIGH|MODERATE|LOW',
+      worstAddress: 'string',
+      wallets: 'array of { address, overallRisk, worstHealthFactor, liquidationPrices, positions }',
+      systemRisk: '{ score, correlatedRisk, fearGreedValue, healthIndex, crossChainDeviation, whaleTransferCount }',
+    },
+  },
+  {
+    path: '/api/early-warning',
+    price: '$0.25', priceRaw: '250000',
+    description: 'Depeg early warning signal — proprietary composite score from velocity, whales, cross-chain, fear & greed, correlated risk',
+    params: [],
+    responseSchema: {
+      fetchedAt: 'ISO-8601 timestamp',
+      earlyWarningScore: 'number 0–100',
+      alertLevel: 'GREEN|YELLOW|ORANGE|RED',
+      summary: 'string', factors: 'array of { factor, signal, rawScore, weight, contribution }',
+      rawData: 'object — source data from each contributing signal',
+    },
+  },
+  {
+    path: '/api/ai-report',
+    price: '$1.00', priceRaw: '1000000',
+    description: 'AI-generated DeFi risk advisory report (Claude claude-sonnet-4-6) — Executive Summary, Risk Breakdown, Key Metrics, Recommendation',
+    params: [
+      { name: 'protocol', required: false, values: 'DeFi Llama slug e.g. aave-v3' },
+      { name: 'address',  required: false, values: '0x… EVM wallet address' },
+    ],
+    responseSchema: {
+      fetchedAt: 'ISO-8601 timestamp',
+      mode: 'protocol|address', subject: 'string',
+      model: 'string', report: 'string — formatted markdown report',
+      dataSnapshot: 'object — all raw data passed to Claude',
+    },
+  },
 ];
 
 function catalogHandler(req, res) {
