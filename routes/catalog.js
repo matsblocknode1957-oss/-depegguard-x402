@@ -234,6 +234,86 @@ const PAID_ENDPOINTS = [
       components: 'object — { tvlRisk, liquidationStress, pegStress, depegSignals } with weights',
     },
   },
+  {
+    path: '/api/cross-chain-depeg',
+    price: '$0.10', priceRaw: '100000',
+    description: 'Cross-chain stablecoin price comparison — same coin on Ethereum, Base, Arbitrum via Chainlink',
+    params: [{ name: 'coin', required: false, default: 'USDC', values: 'USDC|USDT|DAI' }],
+    responseSchema: {
+      fetchedAt: 'ISO-8601 timestamp',
+      coin: 'string', status: 'STABLE|DEPEGGED',
+      maxDeviationPct: 'number',
+      chains: 'array of { chain, price, updatedAt, deviation }',
+    },
+  },
+  {
+    path: '/api/protocol-comparison',
+    price: '$0.10', priceRaw: '100000',
+    description: 'Side-by-side risk comparison of Aave v3, Compound v3, and MakerDAO',
+    params: [],
+    responseSchema: {
+      fetchedAt: 'ISO-8601 timestamp',
+      protocols: 'object keyed by protocol slug',
+      ranking: 'array — protocols ordered safest to riskiest',
+      safest: 'string', riskiest: 'string',
+      systemWide: '{ liquidationStress, pegStress }',
+    },
+  },
+  {
+    path: '/api/liquidation-price',
+    price: '$0.10', priceRaw: '100000',
+    description: 'ETH price at which a wallet\'s positions get liquidated — Aave, Compound, MakerDAO',
+    params: [{ name: 'address', required: true, values: '0x… EVM address' }],
+    responseSchema: {
+      fetchedAt: 'ISO-8601 timestamp',
+      currentEthPrice: 'number',
+      mostAtRisk: '{ protocol, liquidationPriceUsd, safetyBuffer }',
+      positions: 'array of { protocol, healthFactor, liquidationPriceUsd, safetyBuffer }',
+    },
+  },
+  {
+    path: '/api/tvl-trend',
+    price: '$0.05', priceRaw: '50000',
+    description: '7 or 30-day TVL trend for a DeFi protocol with growth rate and linear slope',
+    params: [
+      { name: 'protocol', required: false, default: 'aave-v3', values: 'DeFi Llama slug' },
+      { name: 'days',     required: false, default: '7',       values: '1–30' },
+    ],
+    responseSchema: {
+      fetchedAt: 'ISO-8601 timestamp',
+      protocol: 'string', days: 'number',
+      startTvlUsd: 'number', endTvlUsd: 'number', changePct: 'number',
+      trend: 'GROWING|DECLINING|FLAT|UNKNOWN',
+      slopeUsdMillionsPerDay: 'number', history: 'array of { date, tvlUsd }',
+    },
+  },
+  {
+    path: '/api/chainlink-price',
+    price: '$0.05', priceRaw: '50000',
+    description: 'Live Chainlink on-chain price for ETH, BTC, USDC, USDT, DAI, FRAX, LINK, AAVE, CRV, MATIC, SOL, LUSD',
+    params: [{ name: 'asset', required: false, default: 'ETH', values: 'ETH|BTC|USDC|USDT|DAI|FRAX|LUSD|LINK|AAVE|CRV|MATIC|SOL' }],
+    responseSchema: {
+      fetchedAt: 'ISO-8601 timestamp',
+      pair: 'string e.g. ETH/USD', price: 'number',
+      updatedAt: 'ISO-8601', staleSeconds: 'number', isStale: 'boolean',
+      roundId: 'string', feedAddress: 'string',
+    },
+  },
+  {
+    path: '/api/velocity',
+    price: '$0.05', priceRaw: '50000',
+    description: 'Stablecoin supply velocity — mint/redeem growth rate as a risk signal over 7 or 30 days',
+    params: [
+      { name: 'coin', required: false, default: 'USDC', values: 'USDT|USDC|DAI|FRAX|TUSD|USDP|GUSD|LUSD|PYUSD' },
+      { name: 'days', required: false, default: '30',   values: '1–30' },
+    ],
+    responseSchema: {
+      fetchedAt: 'ISO-8601 timestamp',
+      coin: 'string', currentSupplyUsd: 'number', changePct: 'number', dailyChangePct: 'number',
+      velocitySignal: 'RAPID_EXPANSION|EXPANDING|STABLE|CONTRACTING|RAPID_CONTRACTION',
+      note: 'string', history: 'array of { date, supplyUsd }',
+    },
+  },
 ];
 
 function catalogHandler(req, res) {

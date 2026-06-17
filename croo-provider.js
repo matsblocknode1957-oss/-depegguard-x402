@@ -27,6 +27,13 @@ const ID_TO_KEY = {
   '69d912fa-2f4d-4302-af93-eb4c2a5155ea': 'gas',
   '80dc2b46-79d4-4947-ab20-7d1b7131312e': 'dominance',
   '82227d96-7b8a-4ac7-b437-4401b2eaa67f': 'protocolRisk',
+  // ── batch 3 — replace with CROO marketplace UUIDs once registered ──
+  'CROO_UUID_CROSS_CHAIN_DEPEG':    'crossChainDepeg',
+  'CROO_UUID_PROTOCOL_COMPARISON':  'protocolComparison',
+  'CROO_UUID_LIQUIDATION_PRICE':    'liquidationPrice',
+  'CROO_UUID_TVL_TREND':            'tvlTrend',
+  'CROO_UUID_CHAINLINK_PRICE':      'chainlinkPrice',
+  'CROO_UUID_VELOCITY':             'velocity',
 };
 
 // ── Payload builders ──────────────────────────────────────────────────────────
@@ -386,6 +393,19 @@ async function buildProtocolRisk(opts) {
   return { fetchedAt: new Date().toISOString(), protocol: pd.name || protocol, riskScore: composite, riskLevel: rl, grade, components: { tvlRisk: { score: Math.round(tvlScore), weight: '25%', tvlUsd: typeof tvlNow === 'number' ? tvlNow : null, change24hPct: Math.round(chg24 * 100) / 100 }, liquidationStress: { score: liq, weight: '35%' }, pegStress: { score: peg, weight: '25%' }, depegSignals: { score: depeg, weight: '15%', exitCoins: pegResults.filter((r) => r.signal === 'EXIT').map((r) => r.symbol), hedgeCoins: pegResults.filter((r) => r.signal === 'HEDGE').map((r) => r.symbol) } } };
 }
 
+// Generic adapter: call a route handler with a mock req/res and capture the JSON payload
+async function buildFromRoute(routePath, opts) {
+  const handler = require(routePath);
+  return new Promise((resolve, reject) => {
+    const req = { query: opts };
+    const res = {
+      json:   (data) => resolve(data),
+      status: (code) => ({ json: (data) => reject(new Error(`Route returned ${code}: ${JSON.stringify(data)}`)) }),
+    };
+    Promise.resolve(handler(req, res)).catch(reject);
+  });
+}
+
 // Dispatch table: handler key → builder
 const BUILDERS = {
   signal:          (_opts) => buildSignal(),
@@ -403,16 +423,23 @@ const BUILDERS = {
   macro:           (_opts) => buildMacro(),
   proofOfReserve:  (opts)  => buildProofOfReserve(opts),
   stressTest:      (opts)  => buildStressTest(opts),
-  walletMonitor:   (opts)  => buildWalletMonitor(opts),
-  gas:             (_opts) => buildGas(),
-  dominance:       (_opts) => buildDominance(),
-  protocolRisk:    (opts)  => buildProtocolRisk(opts),
+  walletMonitor:      (opts)  => buildWalletMonitor(opts),
+  gas:                (_opts) => buildGas(),
+  dominance:          (_opts) => buildDominance(),
+  protocolRisk:       (opts)  => buildProtocolRisk(opts),
+  crossChainDepeg:    (opts)  => buildFromRoute('./routes/cross-chain-depeg',    opts),
+  protocolComparison: (_opts) => buildFromRoute('./routes/protocol-comparison',   {}),
+  liquidationPrice:   (opts)  => buildFromRoute('./routes/liquidation-price',     opts),
+  tvlTrend:           (opts)  => buildFromRoute('./routes/tvl-trend',             opts),
+  chainlinkPrice:     (opts)  => buildFromRoute('./routes/chainlink-price',       opts),
+  velocity:           (opts)  => buildFromRoute('./routes/velocity',               opts),
 };
 
 // Services that read parameters from negotiation.requirements JSON
 const PARAMETERIZED = new Set([
   'signalCoin', 'history', 'collateral', 'liquidationRisk', 'tvlRisk',
   'proofOfReserve', 'stressTest', 'walletMonitor', 'protocolRisk',
+  'crossChainDepeg', 'liquidationPrice', 'tvlTrend', 'chainlinkPrice', 'velocity',
 ]);
 
 function parseRequirements(str) {

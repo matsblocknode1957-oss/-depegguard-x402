@@ -138,6 +138,42 @@ const PAID_ROUTES = [
     description:  'Combined TVL + liquidation + depeg risk score for a protocol — ?protocol=aave-v3',
     handler:      require('./routes/protocol-risk'),
   },
+  {
+    resourcePath: '/api/cross-chain-depeg',
+    amountMicro:  '100000',
+    description:  'Cross-chain stablecoin price comparison — Ethereum vs Base vs Arbitrum — ?coin=USDC',
+    handler:      require('./routes/cross-chain-depeg'),
+  },
+  {
+    resourcePath: '/api/protocol-comparison',
+    amountMicro:  '100000',
+    description:  'Side-by-side Aave v3 vs Compound v3 vs MakerDAO risk comparison',
+    handler:      require('./routes/protocol-comparison'),
+  },
+  {
+    resourcePath: '/api/liquidation-price',
+    amountMicro:  '100000',
+    description:  'ETH liquidation price for a wallet across Aave, Compound, MakerDAO — ?address=0x…',
+    handler:      require('./routes/liquidation-price'),
+  },
+  {
+    resourcePath: '/api/tvl-trend',
+    amountMicro:  '50000',
+    description:  '7 or 30 day TVL trend for a DeFi protocol — ?protocol=aave-v3&days=7',
+    handler:      require('./routes/tvl-trend'),
+  },
+  {
+    resourcePath: '/api/chainlink-price',
+    amountMicro:  '50000',
+    description:  'Live Chainlink on-chain price for any supported asset — ?asset=ETH',
+    handler:      require('./routes/chainlink-price'),
+  },
+  {
+    resourcePath: '/api/velocity',
+    amountMicro:  '50000',
+    description:  'Stablecoin supply velocity — mint/redeem rate as a risk signal — ?coin=USDC&days=30',
+    handler:      require('./routes/velocity'),
+  },
 ];
 
 for (const route of PAID_ROUTES) {
