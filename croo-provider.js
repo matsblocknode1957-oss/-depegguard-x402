@@ -41,6 +41,8 @@ const ID_TO_KEY_2 = {
   '6badc61a-fdb8-4977-b448-0c912ef7f02c': 'earlyWarning',
   '4f72b4cb-eaea-4122-8f6f-866fe42f5435': 'aiReport',
   'a16c31c5-0676-4723-960a-3205562eae7f': 'uniswapPool',
+  '00000000-0000-0000-0000-000000000002': 'regime',
+  '00000000-0000-0000-0000-000000000003': 'marketStress',
 };
 
 // ── Payload builders ──────────────────────────────────────────────────────────
@@ -444,6 +446,8 @@ const BUILDERS = {
   earlyWarning:       (_opts) => buildFromRoute('./routes/early-warning',          {}),
   aiReport:           (opts)  => buildFromRoute('./routes/ai-report',              opts),
   uniswapPool:        (opts)  => buildFromRoute('./routes/uniswap-pool',            opts),
+  regime:             (opts)  => buildFromRoute('./routes/regime',                  opts),
+  marketStress:       (_opts) => buildFromRoute('./routes/market-stress',           {}),
 };
 
 // Services that read parameters from negotiation.requirements JSON
@@ -451,7 +455,7 @@ const PARAMETERIZED = new Set([
   'signalCoin', 'history', 'collateral', 'liquidationRisk', 'tvlRisk',
   'proofOfReserve', 'stressTest', 'walletMonitor', 'protocolRisk',
   'crossChainDepeg', 'liquidationPrice', 'tvlTrend', 'chainlinkPrice', 'velocity',
-  'portfolioReport', 'aiReport', 'uniswapPool',
+  'portfolioReport', 'aiReport', 'uniswapPool', 'regime',
 ]);
 
 function parseRequirements(str) {

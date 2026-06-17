@@ -198,6 +198,18 @@ const PAID_ROUTES = [
     description:  'Uniswap V3 pool liquidity snapshot — ?pool=0x… OR ?token0=USDC&token1=ETH&fee=3000',
     handler:      require('./routes/uniswap-pool'),
   },
+  {
+    resourcePath: '/api/regime',
+    amountMicro:  '250000',
+    description:  'PegCheck two-layer regime classifier — Layer A regime + Layer B trajectory + 11 features — ?symbol=USDC',
+    handler:      require('./routes/regime'),
+  },
+  {
+    resourcePath: '/api/market-stress',
+    amountMicro:  '250000',
+    description:  'System-wide stablecoin stress assessment across all 19 monitored coins — stress level + per-coin regimes',
+    handler:      require('./routes/market-stress'),
+  },
 ];
 
 for (const route of PAID_ROUTES) {
