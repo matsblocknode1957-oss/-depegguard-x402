@@ -37,10 +37,9 @@ const ID_TO_KEY_2 = {
   '6059ee21-276b-400e-af60-0cb82e73ef5b': 'tvlTrend',
   'bfab5bdd-63bf-4afc-b72e-00f05967c5ac': 'chainlinkPrice',
   '6aa7128f-a820-4be6-ba04-09fba5d27d3f': 'velocity',
-  // ── premium batch — replace with CROO marketplace UUIDs once registered ──
-  'CROO_UUID_PORTFOLIO_REPORT': 'portfolioReport',
-  'CROO_UUID_EARLY_WARNING':    'earlyWarning',
-  'CROO_UUID_AI_REPORT':        'aiReport',
+  '17423e64-20be-4810-9a08-8280ca1983cd': 'portfolioReport',
+  '6badc61a-fdb8-4977-b448-0c912ef7f02c': 'earlyWarning',
+  '4f72b4cb-eaea-4122-8f6f-866fe42f5435': 'aiReport',
 };
 
 // ── Payload builders ──────────────────────────────────────────────────────────
