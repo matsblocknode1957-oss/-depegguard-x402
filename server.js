@@ -84,6 +84,60 @@ const PAID_ROUTES = [
     description:  'Correlated stablecoin risk score from FintechCheck Risk Engine',
     handler:      require('./routes/correlated-risk'),
   },
+  {
+    resourcePath: '/api/yield',
+    amountMicro:  '50000',
+    description:  'Stablecoin yield comparison across Aave, Compound, Curve',
+    handler:      require('./routes/yield'),
+  },
+  {
+    resourcePath: '/api/edgar',
+    amountMicro:  '100000',
+    description:  'SEC EDGAR filing alerts — latest stablecoin issuer filings',
+    handler:      require('./routes/edgar'),
+  },
+  {
+    resourcePath: '/api/macro',
+    amountMicro:  '50000',
+    description:  'FRED macro indicators — fed funds rate, CPI, SOFR, M2, 2yr treasury',
+    handler:      require('./routes/macro'),
+  },
+  {
+    resourcePath: '/api/proof-of-reserve',
+    amountMicro:  '100000',
+    description:  'Chainlink Proof of Reserve verification — ?coin=TUSD|PAXG',
+    handler:      require('./routes/proof-of-reserve'),
+  },
+  {
+    resourcePath: '/api/stress-test',
+    amountMicro:  '100000',
+    description:  'Portfolio stress test against historical depeg scenarios — ?portfolio=USDC:10000,USDT:5000',
+    handler:      require('./routes/stress-test'),
+  },
+  {
+    resourcePath: '/api/wallet-monitor',
+    amountMicro:  '100000',
+    description:  'Multi-protocol wallet borrow positions — Aave v3, Compound v3, MakerDAO on Ethereum mainnet',
+    handler:      require('./routes/wallet-monitor'),
+  },
+  {
+    resourcePath: '/api/gas',
+    amountMicro:  '50000',
+    description:  'Current Base and Ethereum gas prices in gwei',
+    handler:      require('./routes/gas'),
+  },
+  {
+    resourcePath: '/api/dominance',
+    amountMicro:  '50000',
+    description:  'Stablecoin market cap as % of total crypto market cap',
+    handler:      require('./routes/dominance'),
+  },
+  {
+    resourcePath: '/api/protocol-risk',
+    amountMicro:  '100000',
+    description:  'Combined TVL + liquidation + depeg risk score for a protocol — ?protocol=aave-v3',
+    handler:      require('./routes/protocol-risk'),
+  },
 ];
 
 for (const route of PAID_ROUTES) {

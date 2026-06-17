@@ -129,6 +129,111 @@ const PAID_ENDPOINTS = [
       pegStress: 'number', liquidationStress: 'number', flowPressure: 'number',
     },
   },
+  {
+    path: '/api/yield',
+    price: '$0.05', priceRaw: '50000',
+    description: 'Stablecoin yield comparison — best APY across Aave, Compound, Curve',
+    params: [],
+    responseSchema: {
+      fetchedAt: 'ISO-8601 timestamp',
+      topYield: 'object — highest APY pool', bestByProject: 'object — best per protocol',
+      allPools: 'array of up to 30 stablecoin pools sorted by APY',
+    },
+  },
+  {
+    path: '/api/edgar',
+    price: '$0.10', priceRaw: '100000',
+    description: 'SEC EDGAR filing alerts — latest filings by stablecoin issuers (Circle, Paxos, TrustToken)',
+    params: [],
+    responseSchema: {
+      fetchedAt: 'ISO-8601 timestamp',
+      count: 'number', filings: 'array of { filedAt, formType, company, description, period, url }',
+    },
+  },
+  {
+    path: '/api/macro',
+    price: '$0.05', priceRaw: '50000',
+    description: 'FRED macro indicators with stablecoin risk context — fed funds, CPI, SOFR, M2, 2yr treasury',
+    params: [],
+    responseSchema: {
+      fetchedAt: 'ISO-8601 timestamp',
+      indicators: 'object — { federalFundsRate, cpi, treasury2y, sofr, m2SlnUsd }',
+      stablecoinContext: '{ riskLevel: ELEVATED|MODERATE|LOW, note: string }',
+    },
+  },
+  {
+    path: '/api/proof-of-reserve',
+    price: '$0.10', priceRaw: '100000',
+    description: 'Chainlink Proof of Reserve verification — on-chain reserves vs total supply',
+    params: [{ name: 'coin', required: false, default: 'TUSD', values: 'TUSD|PAXG' }],
+    responseSchema: {
+      fetchedAt: 'ISO-8601 timestamp',
+      coin: 'string', reservesUsd: 'number', totalSupply: 'number',
+      reserveRatio: 'number (≥1.0 = fully backed)',
+      status: 'BACKED|UNDERBACKED|UNKNOWN',
+    },
+  },
+  {
+    path: '/api/stress-test',
+    price: '$0.10', priceRaw: '100000',
+    description: 'Portfolio stress test against historical depeg scenarios (SVB, USDT FUD, UST collapse, Black Thursday)',
+    params: [
+      { name: 'portfolio', required: false, default: 'equal $10k split', values: 'USDC:10000,USDT:5000,DAI:2000 format' },
+      { name: 'total',     required: false, default: '10000', values: 'total USD for equal-split default portfolio' },
+    ],
+    responseSchema: {
+      fetchedAt: 'ISO-8601 timestamp',
+      portfolioValueUsd: 'number',
+      worstScenario: '{ name, lossUsd, lossPct }',
+      scenarios: 'array — per-scenario breakdown with coinBreakdown',
+    },
+  },
+  {
+    path: '/api/wallet-monitor',
+    price: '$0.10', priceRaw: '100000',
+    description: 'Multi-protocol borrow positions for a wallet — Aave v3, Compound v3, MakerDAO on Ethereum mainnet',
+    params: [{ name: 'address', required: true, values: '0x… EVM address' }],
+    responseSchema: {
+      fetchedAt: 'ISO-8601 timestamp',
+      address: 'string', ethPriceUsd: 'number',
+      overallRisk: 'SAFE|MODERATE|ELEVATED|CRITICAL|LIQUIDATABLE|NO_POSITIONS',
+      worstHealthFactor: 'number',
+      positions: 'array of { protocol, healthFactor, collateralUsd, debtUsd, riskLevel }',
+    },
+  },
+  {
+    path: '/api/gas',
+    price: '$0.05', priceRaw: '50000',
+    description: 'Current Base and Ethereum gas prices — base fee + priority fee in gwei',
+    params: [],
+    responseSchema: {
+      fetchedAt: 'ISO-8601 timestamp',
+      networks: 'array of { network, baseFeeGwei, priorityFeeGwei, totalGwei, estimatedUsdcTransferCostUsd }',
+    },
+  },
+  {
+    path: '/api/dominance',
+    price: '$0.05', priceRaw: '50000',
+    description: 'Stablecoin dominance — stablecoin market cap as % of total crypto market cap',
+    params: [],
+    responseSchema: {
+      fetchedAt: 'ISO-8601 timestamp',
+      stablecoinMarketCapUsd: 'number', totalCryptoMarketCapUsd: 'number',
+      dominancePct: 'number', change24hPct: 'number',
+      trend: 'EXPANDING|CONTRACTING|STABLE', topStablecoins: 'array of { symbol, marketCapUsd, sharePct }',
+    },
+  },
+  {
+    path: '/api/protocol-risk',
+    price: '$0.10', priceRaw: '100000',
+    description: 'Combined risk score for a DeFi protocol — TVL, liquidation stress, peg stress, depeg signals',
+    params: [{ name: 'protocol', required: false, default: 'aave-v3', values: 'DeFi Llama slug' }],
+    responseSchema: {
+      fetchedAt: 'ISO-8601 timestamp',
+      riskScore: 'number 0–100', riskLevel: 'CRITICAL|HIGH|MODERATE|LOW', grade: 'A+|A|B|C|D|F',
+      components: 'object — { tvlRisk, liquidationStress, pegStress, depegSignals } with weights',
+    },
+  },
 ];
 
 function catalogHandler(req, res) {

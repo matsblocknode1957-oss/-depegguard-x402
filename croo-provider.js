@@ -18,6 +18,16 @@ const ID_TO_KEY = {
   'ef1da897-7208-4fe6-bb9a-8beaa9ad0ad6': 'liquidationRisk',
   'e02583e5-01ca-43b7-bf88-b4071368ee0d': 'tvlRisk',
   '5b38507a-df2c-45d1-b436-9a7d7dde586c': 'correlatedRisk',
+  // ── new services — replace placeholders with CROO marketplace UUIDs once registered ──
+  'CROO_UUID_YIELD':          'yield',
+  'CROO_UUID_EDGAR':          'edgar',
+  'CROO_UUID_MACRO':          'macro',
+  'CROO_UUID_PROOF_OF_RESERVE': 'proofOfReserve',
+  'CROO_UUID_STRESS_TEST':    'stressTest',
+  'CROO_UUID_WALLET_MONITOR': 'walletMonitor',
+  'CROO_UUID_GAS':            'gas',
+  'CROO_UUID_DOMINANCE':      'dominance',
+  'CROO_UUID_PROTOCOL_RISK':  'protocolRisk',
 };
 
 // ── Payload builders ──────────────────────────────────────────────────────────
@@ -203,6 +213,180 @@ async function buildCorrelatedRisk() {
   };
 }
 
+// ── New service builders (delegate to route handlers via shared logic) ────────
+
+async function buildYield() {
+  const res = await fetch('https://yields.llama.fi/pools', { signal: AbortSignal.timeout(20_000) });
+  if (!res.ok) throw new Error(`DeFi Llama yields returned ${res.status}`);
+  const { data: pools } = await res.json();
+  const TARGET = new Set(['aave-v3', 'compound-v3', 'curve-dex', 'curve']);
+  const SYMS   = new Set(['USDC', 'USDT', 'DAI', 'FRAX', 'LUSD', 'PYUSD', 'USDP', 'TUSD', 'GUSD', 'USDS']);
+  const filtered = pools
+    .filter((p) => p.stablecoin === true && TARGET.has(p.project))
+    .filter((p) => [...SYMS].some((s) => (p.symbol || '').toUpperCase().includes(s)))
+    .map((p) => ({ project: p.project, chain: p.chain, symbol: p.symbol, apy: Math.round((p.apy ?? 0) * 100) / 100, tvlUsd: Math.round(p.tvlUsd ?? 0) }))
+    .sort((a, b) => b.apy - a.apy);
+  const best = {};
+  for (const p of filtered) if (!best[p.project]) best[p.project] = p;
+  return { fetchedAt: new Date().toISOString(), topYield: filtered[0] ?? null, bestByProject: best, allPools: filtered.slice(0, 30) };
+}
+
+async function buildEdgar() {
+  const SEC_UA = 'DepegGuard/1.0 contact@depegguard.com';
+  const queries = ['"Circle Internet" stablecoin', '"Paxos Trust" stablecoin', 'stablecoin "proof of reserve"'];
+  const results = await Promise.all(queries.map(async (q) => {
+    const params = new URLSearchParams({ q, forms: '8-K,S-1,10-K', dateRange: 'custom', startdt: '2024-01-01', hits: '5' });
+    const r = await fetch(`https://efts.sec.gov/LATEST/search-index?${params}`, { headers: { 'User-Agent': SEC_UA, Accept: 'application/json' }, signal: AbortSignal.timeout(10_000) });
+    if (!r.ok) return [];
+    const d = await r.json();
+    return (d.hits?.hits ?? []).map((h) => ({ filedAt: h._source?.file_date ?? null, formType: h._source?.form_type ?? null, company: (h._source?.display_names ?? []).join(', ') || null, description: h._source?.file_description ?? null }));
+  }));
+  const seen = new Set();
+  const filings = results.flat().filter((f) => { const k = `${f.company}|${f.filedAt}|${f.formType}`; if (seen.has(k)) return false; seen.add(k); return true; }).sort((a, b) => (b.filedAt ?? '').localeCompare(a.filedAt ?? '')).slice(0, 20);
+  return { fetchedAt: new Date().toISOString(), source: 'SEC EDGAR', count: filings.length, filings };
+}
+
+async function buildMacro() {
+  const apiKey = process.env.FRED_API_KEY;
+  if (!apiKey) throw new Error('FRED_API_KEY not configured');
+  const SERIES = { federalFundsRate: 'FEDFUNDS', cpi: 'CPIAUCSL', treasury2y: 'DGS2', sofr: 'SOFR', m2: 'M2SL' };
+  const fetchS = async (id) => {
+    const p = new URLSearchParams({ series_id: id, api_key: apiKey, file_type: 'json', limit: '1', sort_order: 'desc' });
+    const r = await fetch(`https://api.stlouisfed.org/fred/series/observations?${p}`, { signal: AbortSignal.timeout(8_000) });
+    if (!r.ok) return null;
+    const d = await r.json();
+    const o = d.observations?.[0];
+    return o && o.value !== '.' ? { value: parseFloat(o.value), date: o.date } : null;
+  };
+  const [ffr, cpi, t2y, sofr, m2] = await Promise.all(Object.values(SERIES).map(fetchS));
+  const rate = ffr?.value ?? 0;
+  const ctx = rate >= 5 ? { riskLevel: 'ELEVATED', note: 'High rates compress stablecoin on-chain yield incentives' }
+    : rate >= 3 ? { riskLevel: 'MODERATE', note: 'Moderate rates — Treasury competition elevated' }
+    : { riskLevel: 'LOW', note: 'Low rate environment favourable for stablecoin on-chain yield' };
+  return { fetchedAt: new Date().toISOString(), indicators: { federalFundsRate: ffr, cpi, treasury2y: t2y, sofr, m2SlnUsd: m2 ? { value: m2.value * 1e9, date: m2.date } : null }, stablecoinContext: ctx };
+}
+
+async function buildProofOfReserve(opts) {
+  const POR = {
+    TUSD: { reserves: '0x478f78a3E3cEf0e0cf7c26f12E6dB4b755f4e2e', totalSupply: '0x9B22cC2b2A89C1E43fBf3DDcE3B13FCAB0Abbc0', decimals: 18 },
+    PAXG: { reserves: '0x9B97304EA12EFed0FAd976FBeCAad46016bf269e', totalSupply: '0x7BE2B6Cc6CE7EF6700a9B6BaDdAe21A00a573b0e', decimals: 18 },
+  };
+  const coin = ((opts.coin || 'TUSD')).toUpperCase();
+  const feed = POR[coin];
+  if (!feed) throw new Error(`Unsupported coin: ${coin}`);
+  const rpcUrl = process.env.ETH_RPC_URL || 'https://ethereum.publicnode.com';
+  const readFeed = async (addr) => {
+    const r = await fetch(rpcUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: addr, data: '0xfeaf968c' }, 'latest'] }), signal: AbortSignal.timeout(8_000) });
+    const j = await r.json();
+    if (!j.result || j.result === '0x') return null;
+    const hex = j.result.replace('0x', '');
+    return { answer: BigInt('0x' + hex.slice(64, 128)), updatedAt: new Date(Number(BigInt('0x' + hex.slice(192, 256))) * 1000).toISOString() };
+  };
+  const [rv, sv] = await Promise.all([readFeed(feed.reserves), readFeed(feed.totalSupply)]);
+  if (!rv || !sv) throw new Error('Failed to read Chainlink PoR feeds');
+  const d = 10n ** BigInt(feed.decimals);
+  const res = Number(rv.answer) / Number(d), sup = Number(sv.answer) / Number(d);
+  const ratio = sup > 0 ? Math.round((res / sup) * 10000) / 10000 : null;
+  return { fetchedAt: new Date().toISOString(), coin, source: 'Chainlink Proof of Reserve', chain: 'ethereum', reservesUsd: Math.round(res), totalSupply: Math.round(sup), reserveRatio: ratio, status: ratio == null ? 'UNKNOWN' : ratio >= 1 ? 'BACKED' : 'UNDERBACKED' };
+}
+
+async function buildStressTest(opts) {
+  const SCENARIOS = [
+    { id: 'svb-2023', name: 'SVB Collapse (March 2023)', description: 'Circle disclosed $3.3B USDC reserves at SVB; USDC depegged for ~60 hours', prices: { USDC: 0.877, USDT: 1.000, DAI: 0.989, FRAX: 0.980, LUSD: 1.000, DOLA: 0.993, PYUSD: 1.000 } },
+    { id: 'usdt-fud-2018', name: 'Tether FUD (October 2018)', description: 'Tether solvency concerns drove USDT to $0.95 for ~24 hours', prices: { USDC: 1.000, USDT: 0.951, DAI: 1.000, FRAX: 1.000, LUSD: 1.000, DOLA: 1.000, PYUSD: 1.000 } },
+    { id: 'ust-contagion-2022', name: 'UST/LUNA Collapse (May 2022)', description: 'UST collapse caused broad stablecoin contagion', prices: { USDC: 0.998, USDT: 0.997, DAI: 0.997, FRAX: 0.970, LUSD: 0.998, DOLA: 0.981, PYUSD: 1.000 } },
+    { id: 'frax-depeg-2022', name: 'FRAX Algo Stress (November 2022)', description: 'Post-FTX contagion stress tested partially-algorithmic FRAX', prices: { USDC: 1.000, USDT: 1.000, DAI: 1.000, FRAX: 0.968, LUSD: 0.999, DOLA: 0.990, PYUSD: 1.000 } },
+    { id: 'black-thursday-2020', name: 'Black Thursday (March 2020)', description: 'COVID crash caused DAI to trade at a premium as ETH collateral collapsed', prices: { USDC: 1.000, USDT: 1.001, DAI: 1.060, FRAX: 1.000, LUSD: 1.000, DOLA: 1.000, PYUSD: 1.000 } },
+  ];
+  const SUPPORTED = ['USDC', 'USDT', 'DAI', 'FRAX', 'LUSD', 'DOLA', 'PYUSD'];
+  let portfolio = {};
+  if (opts.portfolio) {
+    for (const part of opts.portfolio.split(',')) {
+      const [coin, amount] = part.trim().split(':');
+      const sym = (coin || '').toUpperCase(), val = parseFloat(amount);
+      if (SUPPORTED.includes(sym) && isFinite(val) && val > 0) portfolio[sym] = (portfolio[sym] || 0) + val;
+    }
+  }
+  if (Object.keys(portfolio).length === 0) {
+    const perCoin = Math.round((parseFloat(opts.total) || 10000) / SUPPORTED.length);
+    portfolio = Object.fromEntries(SUPPORTED.map((c) => [c, perCoin]));
+  }
+  const pv = Object.values(portfolio).reduce((s, v) => s + v, 0);
+  const scenarios = SCENARIOS.map((s) => {
+    let sv = 0; const cb = {};
+    for (const [c, u] of Object.entries(portfolio)) { const p = s.prices[c] ?? 1; const st = u * p; sv += st; cb[c] = { holdingUsd: u, stressPrice: p, stressedUsd: Math.round(st * 100) / 100, lossUsd: Math.round((u - st) * 100) / 100, lossPct: Math.round((1 - p) * 10000) / 100 }; }
+    return { scenarioId: s.id, name: s.name, description: s.description, portfolioLossUsd: Math.round((pv - sv) * 100) / 100, portfolioLossPct: Math.round(((pv - sv) / pv) * 10000) / 100, stressedValueUsd: Math.round(sv * 100) / 100, coinBreakdown: cb };
+  }).sort((a, b) => b.portfolioLossUsd - a.portfolioLossUsd);
+  const worst = scenarios[0];
+  return { fetchedAt: new Date().toISOString(), portfolio, portfolioValueUsd: pv, worstScenario: { name: worst.name, lossUsd: worst.portfolioLossUsd, lossPct: worst.portfolioLossPct }, scenarios };
+}
+
+async function buildWalletMonitor(opts) {
+  if (!opts.address) throw new Error('address required for wallet-monitor service');
+  const { isAddress } = await import('viem');
+  if (!isAddress(opts.address)) throw new Error('Invalid EVM address');
+  // Delegate to the route handler logic (inline to avoid circular require)
+  const mod = require('./routes/wallet-monitor');
+  // Create a mock req/res to capture the JSON output
+  let payload;
+  await mod({ query: opts }, { json: (d) => { payload = d; }, status: () => ({ json: () => {} }) });
+  return payload;
+}
+
+async function buildGas() {
+  const ethRpc = process.env.ETH_RPC_URL || process.env.ALCHEMY_RPC_URL || 'https://ethereum.publicnode.com';
+  const fetchG = async (network, rpcUrl) => {
+    const r = await fetch(rpcUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_feeHistory', params: ['0x1', 'latest', [50]] }), signal: AbortSignal.timeout(6_000) });
+    const j = await r.json();
+    const fh = j.result; if (!fh) return null;
+    const base = BigInt(fh.baseFeePerGas?.[0] ?? '0x0'), prio = BigInt(fh.reward?.[0]?.[0] ?? '0x0');
+    const toGwei = (w) => Math.round(Number(w) / 1e9 * 1000) / 1000;
+    return { network, baseFeeGwei: toGwei(base), priorityFeeGwei: toGwei(prio), totalGwei: toGwei(base + prio) };
+  };
+  const [base, eth] = await Promise.all([fetchG('base', 'https://mainnet.base.org'), fetchG('ethereum', ethRpc)]);
+  return { fetchedAt: new Date().toISOString(), networks: [base, eth].filter(Boolean), note: 'USD cost estimates assume ETH=$3,000.' };
+}
+
+async function buildDominance() {
+  const [sr, gr] = await Promise.all([
+    fetch('https://stablecoins.llama.fi/stablecoins?includePrices=true', { signal: AbortSignal.timeout(10_000) }),
+    fetch('https://api.coingecko.com/api/v3/global', { signal: AbortSignal.timeout(8_000) }),
+  ]);
+  if (!sr.ok || !gr.ok) throw new Error('Upstream API error');
+  const [sd, gd] = await Promise.all([sr.json(), gr.json()]);
+  const assets = sd.peggedAssets || [];
+  const totalStable = assets.reduce((s, a) => s + (a.circulating?.peggedUSD ?? 0), 0);
+  const totalCrypto = gd.data?.total_market_cap?.usd ?? null;
+  const top10 = assets.map((a) => ({ symbol: a.symbol, marketCapUsd: Math.round(a.circulating?.peggedUSD ?? 0), sharePct: totalStable ? Math.round((a.circulating?.peggedUSD ?? 0) / totalStable * 10000) / 100 : null })).sort((a, b) => b.marketCapUsd - a.marketCapUsd).slice(0, 10);
+  const prev = assets.reduce((s, a) => s + (a.circulatingPrevDay?.peggedUSD ?? a.circulating?.peggedUSD ?? 0), 0);
+  const chg = totalStable - prev;
+  return { fetchedAt: new Date().toISOString(), stablecoinMarketCapUsd: Math.round(totalStable), totalCryptoMarketCapUsd: totalCrypto ? Math.round(totalCrypto) : null, dominancePct: totalCrypto ? Math.round((totalStable / totalCrypto) * 10000) / 100 : null, change24hUsd: Math.round(chg), change24hPct: prev > 0 ? Math.round((chg / prev) * 10000) / 100 : null, trend: chg > 0 ? 'EXPANDING' : chg < 0 ? 'CONTRACTING' : 'STABLE', topStablecoins: top10 };
+}
+
+async function buildProtocolRisk(opts) {
+  const protocol = (opts.protocol || 'aave-v3').toLowerCase();
+  const [tvlRes, protoRes, ftRes, pegResults] = await Promise.all([
+    fetch(`https://api.llama.fi/tvl/${protocol}`, { signal: AbortSignal.timeout(8_000) }),
+    fetch(`https://api.llama.fi/protocol/${protocol}`, { signal: AbortSignal.timeout(10_000) }),
+    fetch(`${FINTECHCHECK}/api/risk`, { signal: AbortSignal.timeout(8_000) }),
+    Promise.all(COINS.slice(0, 4).map(fetchCoin)),
+  ]);
+  if (!protoRes.ok) throw new Error(`DeFi Llama returned ${protoRes.status}`);
+  if (!ftRes.ok)    throw new Error(`FintechCheck returned ${ftRes.status}`);
+  const tvlNow = tvlRes.ok ? await tvlRes.json() : null;
+  const pd = await protoRes.json(), ft = await ftRes.json();
+  const hist = pd.tvl || [], lat = hist[hist.length - 1], yest = hist[hist.length - 2];
+  const chg24 = lat?.totalLiquidityUSD && yest?.totalLiquidityUSD ? ((lat.totalLiquidityUSD - yest.totalLiquidityUSD) / yest.totalLiquidityUSD) * 100 : 0;
+  const tvlScore = Math.min(100, Math.abs(chg24) * 3);
+  const liq = ft.liquidationStress ?? 0, peg = ft.pegStress ?? 0;
+  const exit = pegResults.filter((r) => r.signal === 'EXIT').length, hedge = pegResults.filter((r) => r.signal === 'HEDGE').length;
+  const depeg = Math.min(100, exit * 25 + hedge * 10);
+  const composite = Math.round(tvlScore * 0.25 + liq * 0.35 + peg * 0.25 + depeg * 0.15);
+  const grade = composite <= 10 ? 'A+' : composite <= 20 ? 'A' : composite <= 35 ? 'B' : composite <= 50 ? 'C' : composite <= 65 ? 'D' : 'F';
+  const rl = composite >= 75 ? 'CRITICAL' : composite >= 50 ? 'HIGH' : composite >= 25 ? 'MODERATE' : 'LOW';
+  return { fetchedAt: new Date().toISOString(), protocol: pd.name || protocol, riskScore: composite, riskLevel: rl, grade, components: { tvlRisk: { score: Math.round(tvlScore), weight: '25%', tvlUsd: typeof tvlNow === 'number' ? tvlNow : null, change24hPct: Math.round(chg24 * 100) / 100 }, liquidationStress: { score: liq, weight: '35%' }, pegStress: { score: peg, weight: '25%' }, depegSignals: { score: depeg, weight: '15%', exitCoins: pegResults.filter((r) => r.signal === 'EXIT').map((r) => r.symbol), hedgeCoins: pegResults.filter((r) => r.signal === 'HEDGE').map((r) => r.symbol) } } };
+}
+
 // Dispatch table: handler key → builder
 const BUILDERS = {
   signal:          (_opts) => buildSignal(),
@@ -215,10 +399,22 @@ const BUILDERS = {
   liquidationRisk: (opts)  => buildLiquidationRisk(opts),
   tvlRisk:         (opts)  => buildTvlRisk(opts),
   correlatedRisk:  (_opts) => buildCorrelatedRisk(),
+  yield:           (_opts) => buildYield(),
+  edgar:           (_opts) => buildEdgar(),
+  macro:           (_opts) => buildMacro(),
+  proofOfReserve:  (opts)  => buildProofOfReserve(opts),
+  stressTest:      (opts)  => buildStressTest(opts),
+  walletMonitor:   (opts)  => buildWalletMonitor(opts),
+  gas:             (_opts) => buildGas(),
+  dominance:       (_opts) => buildDominance(),
+  protocolRisk:    (opts)  => buildProtocolRisk(opts),
 };
 
 // Services that read parameters from negotiation.requirements JSON
-const PARAMETERIZED = new Set(['signalCoin', 'history', 'collateral', 'liquidationRisk', 'tvlRisk']);
+const PARAMETERIZED = new Set([
+  'signalCoin', 'history', 'collateral', 'liquidationRisk', 'tvlRisk',
+  'proofOfReserve', 'stressTest', 'walletMonitor', 'protocolRisk',
+]);
 
 function parseRequirements(str) {
   if (!str) return {};
