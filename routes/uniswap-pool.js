@@ -1,8 +1,10 @@
 'use strict';
 
+const SUBGRAPH_ID = '5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV';
+
 const GRAPH_ENDPOINT = process.env.GRAPH_API_KEY
-  ? `https://gateway.thegraph.com/api/${process.env.GRAPH_API_KEY}/subgraphs/id/GqzP4Xaehti8KSfAmLP3nKhRLRiqRkznH1cbSfNtDUEK`
-  : 'https://gateway.thegraph.com/api/subgraphs/id/GqzP4Xaehti8KSfAmLP3nKhRLRiqRkznH1cbSfNtDUEK';
+  ? `https://gateway.thegraph.com/api/${process.env.GRAPH_API_KEY}/subgraphs/id/${SUBGRAPH_ID}`
+  : `https://gateway.thegraph.com/api/subgraphs/id/${SUBGRAPH_ID}`;
 
 const POOL_FIELDS = `
   id
