@@ -3,7 +3,7 @@
 const Anthropic = require('@anthropic-ai/sdk');
 
 const MODEL = 'claude-sonnet-4-6';
-const MAX_TOKENS = 1024;
+const MAX_TOKENS = 4096;
 
 const SYSTEM_PROMPT = `You are a senior DeFi risk analyst. You receive structured JSON data from on-chain and off-chain sources about a DeFi protocol or wallet position. Produce a professional risk advisory report with exactly these four sections:
 
