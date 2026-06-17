@@ -41,8 +41,8 @@ const ID_TO_KEY_2 = {
   '6badc61a-fdb8-4977-b448-0c912ef7f02c': 'earlyWarning',
   '4f72b4cb-eaea-4122-8f6f-866fe42f5435': 'aiReport',
   'a16c31c5-0676-4723-960a-3205562eae7f': 'uniswapPool',
-  '00000000-0000-0000-0000-000000000002': 'regime',
-  '00000000-0000-0000-0000-000000000003': 'marketStress',
+  '7faafaaa-9e31-4277-8f66-663f1f5a36cc': 'regime',
+  '708e1775-acfa-4bfb-ac29-0b3ec6018b16': 'marketStress',
 };
 
 // ── Payload builders ──────────────────────────────────────────────────────────
