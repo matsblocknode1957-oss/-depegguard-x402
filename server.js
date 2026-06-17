@@ -192,6 +192,12 @@ const PAID_ROUTES = [
     description:  'AI-generated DeFi risk advisory report via Claude — ?protocol=aave-v3 OR ?address=0x…',
     handler:      require('./routes/ai-report'),
   },
+  {
+    resourcePath: '/api/uniswap-pool',
+    amountMicro:  '100000',
+    description:  'Uniswap V3 pool liquidity snapshot — ?pool=0x… OR ?token0=USDC&token1=ETH&fee=3000',
+    handler:      require('./routes/uniswap-pool'),
+  },
 ];
 
 for (const route of PAID_ROUTES) {
