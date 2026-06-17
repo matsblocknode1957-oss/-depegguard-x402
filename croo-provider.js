@@ -18,16 +18,15 @@ const ID_TO_KEY = {
   'ef1da897-7208-4fe6-bb9a-8beaa9ad0ad6': 'liquidationRisk',
   'e02583e5-01ca-43b7-bf88-b4071368ee0d': 'tvlRisk',
   '5b38507a-df2c-45d1-b436-9a7d7dde586c': 'correlatedRisk',
-  // ── new services — replace placeholders with CROO marketplace UUIDs once registered ──
-  'CROO_UUID_YIELD':          'yield',
-  'CROO_UUID_EDGAR':          'edgar',
-  'CROO_UUID_MACRO':          'macro',
-  'CROO_UUID_PROOF_OF_RESERVE': 'proofOfReserve',
-  'CROO_UUID_STRESS_TEST':    'stressTest',
-  'CROO_UUID_WALLET_MONITOR': 'walletMonitor',
-  'CROO_UUID_GAS':            'gas',
-  'CROO_UUID_DOMINANCE':      'dominance',
-  'CROO_UUID_PROTOCOL_RISK':  'protocolRisk',
+  '31e34537-988c-4440-b195-8962940d1df1': 'yield',
+  '4ed473a3-51f3-400d-9147-d159aa67010e': 'edgar',
+  'c6903c09-fc65-474e-9db2-950fd400d331': 'macro',
+  'd26044ed-de94-478c-b3b5-9584fe94545e': 'proofOfReserve',
+  '8b3176d6-1511-455f-b5bf-ea62c906817d': 'stressTest',
+  '0223abcc-aaef-409c-ac22-4164f5d42a18': 'walletMonitor',
+  '69d912fa-2f4d-4302-af93-eb4c2a5155ea': 'gas',
+  '80dc2b46-79d4-4947-ab20-7d1b7131312e': 'dominance',
+  '82227d96-7b8a-4ac7-b437-4401b2eaa67f': 'protocolRisk',
 };
 
 // ── Payload builders ──────────────────────────────────────────────────────────
