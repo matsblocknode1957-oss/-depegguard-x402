@@ -6,8 +6,8 @@ const { COINS, PEGCHECK_HISTORY, fetchCoin } = require('./lib/pegcheck');
 const FINTECHCHECK = process.env.FINTECHCHECK_URL
   || 'https://fintechcheck-production.up.railway.app';
 
-// ── Service ID → handler key ──────────────────────────────────────────────────
-const ID_TO_KEY = {
+// ── Service ID → handler key (agent 1 — CROO_SDK_KEY) ────────────────────────
+const ID_TO_KEY_1 = {
   '54931089-096a-43b1-812a-ebdc412c58d1': 'signal',
   '187217b4-1a33-414d-bfd9-e70ec3eafebb': 'signalCoin',
   '7c96a4e6-958e-49ad-a0b6-e70acd7de1a9': 'healthIndex',
@@ -27,13 +27,16 @@ const ID_TO_KEY = {
   '69d912fa-2f4d-4302-af93-eb4c2a5155ea': 'gas',
   '80dc2b46-79d4-4947-ab20-7d1b7131312e': 'dominance',
   '82227d96-7b8a-4ac7-b437-4401b2eaa67f': 'protocolRisk',
-  // ── batch 3 — replace with CROO marketplace UUIDs once registered ──
-  'CROO_UUID_CROSS_CHAIN_DEPEG':    'crossChainDepeg',
-  'CROO_UUID_PROTOCOL_COMPARISON':  'protocolComparison',
-  'CROO_UUID_LIQUIDATION_PRICE':    'liquidationPrice',
-  'CROO_UUID_TVL_TREND':            'tvlTrend',
-  'CROO_UUID_CHAINLINK_PRICE':      'chainlinkPrice',
-  'CROO_UUID_VELOCITY':             'velocity',
+};
+
+// ── Service ID → handler key (agent 2 — CROO_SDK_KEY_2) ──────────────────────
+const ID_TO_KEY_2 = {
+  '0b1d862c-bde1-428f-a2df-41840b0be28a': 'crossChainDepeg',
+  'a0d89758-55fb-4936-b6c7-3fe5ecc6b59a': 'protocolComparison',
+  '09e0e2c8-98db-4693-bac6-01f9e9f6a2f2': 'liquidationPrice',
+  '6059ee21-276b-400e-af60-0cb82e73ef5b': 'tvlTrend',
+  'bfab5bdd-63bf-4afc-b72e-00f05967c5ac': 'chainlinkPrice',
+  '6aa7128f-a820-4be6-ba04-09fba5d27d3f': 'velocity',
 };
 
 // ── Payload builders ──────────────────────────────────────────────────────────
@@ -449,72 +452,84 @@ function parseRequirements(str) {
 
 // ── Provider lifecycle ────────────────────────────────────────────────────────
 
-async function init() {
-  if (!process.env.CROO_SDK_KEY) {
-    console.warn('[croo] CROO_SDK_KEY not set — provider disabled');
-    return;
-  }
-
+async function createProvider(sdkKey, idToKey, label) {
   const client = new AgentClient(
     {
       baseURL: process.env.CROO_API_URL,
       wsURL:   process.env.CROO_WS_URL,
       rpcURL:  process.env.BASE_RPC_URL,
     },
-    process.env.CROO_SDK_KEY,
+    sdkKey,
   );
 
   const stream = await client.connectWebSocket();
-  console.log('[croo] provider connected, waiting for orders…');
+  console.log(`[${label}] provider connected, waiting for orders…`);
 
   stream.on(EventType.NegotiationCreated, async (e) => {
-    const key = ID_TO_KEY[e.service_id];
+    const key = idToKey[e.service_id];
     if (!key) {
-      console.warn(`[croo] negotiation ${e.negotiation_id} — unknown service_id "${e.service_id}", rejecting`);
+      console.warn(`[${label}] negotiation ${e.negotiation_id} — unknown service_id "${e.service_id}", rejecting`);
       try { await client.rejectNegotiation(e.negotiation_id, 'Service not offered'); } catch {}
       return;
     }
-    console.log(`[croo] negotiation ${e.negotiation_id} (${e.service_id}) — accepting`);
+    console.log(`[${label}] negotiation ${e.negotiation_id} (${e.service_id}) — accepting`);
     try {
       const result = await client.acceptNegotiation(e.negotiation_id);
-      console.log(`[croo] order created ${result.order.orderId}`);
+      console.log(`[${label}] order created ${result.order.orderId}`);
     } catch (err) {
-      console.error('[croo] accept failed:', err.message);
+      console.error(`[${label}] accept failed:`, err.message);
     }
   });
 
   stream.on(EventType.OrderPaid, async (e) => {
-    const key = ID_TO_KEY[e.service_id];
+    const key = idToKey[e.service_id];
     if (!key) {
-      console.warn(`[croo] order ${e.order_id} — unknown service_id "${e.service_id}", skipping`);
+      console.warn(`[${label}] order ${e.order_id} — unknown service_id "${e.service_id}", skipping`);
       return;
     }
-    console.log(`[croo] order ${e.order_id} (${e.service_id}) paid — building payload`);
+    console.log(`[${label}] order ${e.order_id} (${e.service_id}) paid — building payload`);
     try {
       let opts = {};
       if (PARAMETERIZED.has(key)) {
-        const order = await client.getOrder(e.order_id);
+        const order       = await client.getOrder(e.order_id);
         const negotiation = await client.getNegotiation(order.negotiationId);
         opts = parseRequirements(negotiation.requirements);
       }
       const payload = await BUILDERS[key](opts);
-      const result = await client.deliverOrder(e.order_id, {
+      const result  = await client.deliverOrder(e.order_id, {
         deliverableType: DeliverableType.Schema,
         deliverableText: JSON.stringify(payload),
       });
-      console.log(`[croo] order ${e.order_id} delivered, tx: ${result.txHash}`);
+      console.log(`[${label}] order ${e.order_id} delivered, tx: ${result.txHash}`);
     } catch (err) {
-      console.error(`[croo] order ${e.order_id} delivery failed:`, err.message);
+      console.error(`[${label}] order ${e.order_id} delivery failed:`, err.message);
     }
   });
 
   stream.onAny((e) => {
     if (e.type !== EventType.NegotiationCreated && e.type !== EventType.OrderPaid) {
-      console.log(`[croo] event ${e.type}`, e.order_id ?? e.negotiation_id ?? '');
+      console.log(`[${label}] event ${e.type}`, e.order_id ?? e.negotiation_id ?? '');
     }
   });
 
   return stream;
+}
+
+async function init() {
+  const results = await Promise.allSettled([
+    process.env.CROO_SDK_KEY
+      ? createProvider(process.env.CROO_SDK_KEY,   ID_TO_KEY_1, 'croo-1')
+      : Promise.resolve(console.warn('[croo-1] CROO_SDK_KEY not set — provider disabled')),
+    process.env.CROO_SDK_KEY_2
+      ? createProvider(process.env.CROO_SDK_KEY_2, ID_TO_KEY_2, 'croo-2')
+      : Promise.resolve(console.warn('[croo-2] CROO_SDK_KEY_2 not set — provider disabled')),
+  ]);
+
+  for (const r of results) {
+    if (r.status === 'rejected') {
+      console.error('[croo] a provider failed to start:', r.reason?.message);
+    }
+  }
 }
 
 module.exports = { init };
