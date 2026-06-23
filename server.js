@@ -13,6 +13,7 @@ app.use(express.json());
 // ── Free endpoints ────────────────────────────────────────────────────────────
 app.get('/', require('./routes/info'));
 app.get('/api/catalog', require('./routes/catalog'));
+app.use('/casper', require('./routes/casper-signal'));
 
 // ── Paid route registry ───────────────────────────────────────────────────────
 const sharedConfig = {
