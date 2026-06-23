@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { fetchCoin } = require('../lib/pegcheck');
 
-const CASPER_RPC = 'https://rpc.testnet.casper.network';
+const CASPER_RPC = 'https://node.testnet.casper.network/rpc';
 const CASPER_RECIPIENT = '0116ef6d6c6e8e11611b2c0019cb11fc937808842153313079c61a741a99918b9e';
 const MIN_MOTES = BigInt('2500000000'); // 2.5 CSPR minimum
 const USED_DEPLOYS = new Set(); // replay protection (in-memory, fine for hackathon)
