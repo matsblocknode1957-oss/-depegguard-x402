@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { fetchCoin } = require('../lib/pegcheck');
 
 const CASPER_RPC = 'https://rpc.testnet.casper.network';
 const CASPER_RECIPIENT = '0116ef6d6c6e8e11611b2c0019cb11fc937808842153313079c61a741a99918b9e';
@@ -97,25 +98,8 @@ router.get('/signal', async (req, res) => {
     // Mark as used
     USED_DEPLOYS.add(deploy_hash);
 
-    // Pull signal from existing PegCheck logic
     const targetCoin = (coin || 'USDC').toUpperCase();
-
-    // Reuse your existing signal endpoint logic
-    const signalRes = await fetch(`http://localhost:${process.env.PORT || 3000}/api/signal?coin=${targetCoin}`, {
-      headers: { 'x-internal': 'true' }
-    });
-
-    let signalData;
-    if (signalRes.ok) {
-      signalData = await signalRes.json();
-    } else {
-      // Fallback: basic signal shape
-      signalData = {
-        coin: targetCoin,
-        status: 'ok',
-        note: 'Signal endpoint unavailable, payment verified'
-      };
-    }
+    const signalData = await fetchCoin(targetCoin);
 
     return res.json({
       paid: true,
