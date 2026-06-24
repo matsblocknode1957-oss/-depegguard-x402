@@ -24,36 +24,28 @@ async function getCasperDeploy(deployHash) {
 }
 
 function extractTransferDetails(deployResult) {
-  const deploy = deployResult.deploy;
-  const execResults = deployResult.execution_results;
+  const execInfo = deployResult.execution_info;
 
-  // Must have execution results and be successful
-  if (!execResults || execResults.length === 0) {
+  if (!execInfo) {
     return { valid: false, reason: 'Deploy not yet executed - wait a moment and retry' };
   }
 
-  const result = execResults[0].result;
-  if (result.Failure) {
-    return { valid: false, reason: `Deploy failed on chain: ${result.Failure.error_message}` };
+  const v2 = execInfo.execution_result?.Version2;
+  if (!v2) {
+    return { valid: false, reason: 'Unexpected execution result format' };
   }
 
-  // Extract transfer session args
-  const session = deploy.session;
-  if (!session.Transfer) {
-    return { valid: false, reason: 'Deploy is not a CSPR transfer' };
+  if (v2.error_message !== null && v2.error_message !== undefined) {
+    return { valid: false, reason: `Deploy failed on chain: ${v2.error_message}` };
   }
 
-  const args = session.Transfer.args;
-  let amount = null;
-  let target = null;
-
-  for (const [key, val] of args) {
-    if (key === 'amount') amount = BigInt(val.parsed);
-    if (key === 'target') target = val.parsed;
+  const transfer = v2.transfers?.[0]?.Version2;
+  if (!transfer) {
+    return { valid: false, reason: 'Deploy is not a CSPR transfer or transfer record missing' };
   }
 
-  // Also check execution transfers for the actual recipient
-  const transfers = result.Success?.effect?.transforms || [];
+  const amount = BigInt(transfer.amount);
+  const target = transfer.to; // account hash of recipient
 
   return { valid: true, amount, target };
 }
