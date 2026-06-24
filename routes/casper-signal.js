@@ -65,7 +65,6 @@ router.get('/signal', async (req, res) => {
 
   try {
     const deployResult = await getCasperDeploy(deploy_hash);
-    console.log('[casper-signal] deployResult:', JSON.stringify(deployResult, null, 2));
     const { valid, reason, amount, target } = extractTransferDetails(deployResult);
 
     if (!valid) {
