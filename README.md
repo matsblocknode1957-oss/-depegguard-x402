@@ -1,15 +1,57 @@
 # DepegGuard x402
 
-Stablecoin depeg signal API gated by **x402 V2** micropayments on Base mainnet.  
-$0.001 USDC per call. Covers USDT, USDC, DAI, FRAX, LUSD, DOLA, PYUSD.
+Stablecoin depeg signal API with two payment methods:
 
-Payment verification is handled by [`@piprail/sdk`](https://www.npmjs.com/package/@piprail/sdk) — no external facilitator, verified directly on-chain via a Base RPC you control.
+- **x402 V2 on Base** — $0.001 USDC per call, verified on-chain via [`@piprail/sdk`](https://www.npmjs.com/package/@piprail/sdk)
+- **Native CSPR on Casper testnet** — 2.5 CSPR minimum, verified via deploy/transaction hash lookup
+
+Covers USDT, USDC, DAI, FRAX, LUSD, DOLA, PYUSD.
+
+---
+
+## Casper payment endpoint
+
+Send CSPR to the recipient on Casper testnet, then call `/casper/signal` with the hash as proof.
+
+**Recipient:** `account-hash-fd5650d31c33ab1a9bfce31b5c18928d8d730ef01a0196583f982599733f57b3`  
+**Minimum:** 2.5 CSPR (2,500,000,000 motes)  
+**Chain:** `casper-test`
+
+### Discover payment info (free)
+
+```bash
+curl https://depegguard-x402-production.up.railway.app/casper/info
+```
+
+```json
+{
+  "description": "DepegGuard CSPR-paid signal endpoint",
+  "chain": "casper-test",
+  "recipient": "account-hash-fd5650d31c33ab1a9bfce31b5c18928d8d730ef01a0196583f982599733f57b3",
+  "min_payment_cspr": 2.5,
+  "min_payment_motes": "2500000000",
+  "usage": {
+    "v1_deploy":      "/casper/signal?deploy_hash=YOUR_HASH&coin=USDC",
+    "v2_transaction": "/casper/signal?transaction_hash=YOUR_HASH&coin=USDC"
+  }
+}
+```
+
+### Call with a v2 transaction hash
+
+```bash
+curl "https://depegguard-x402-production.up.railway.app/casper/signal?transaction_hash=054283b7de64d361bb2027bf95a973f9ee14676dd0218ad1e293f1aba1f8402e&coin=USDC"
+```
+
+Both v1 deploy hashes (`deploy_hash=`) and v2 transaction hashes (`transaction_hash=`) are accepted. Each hash can only be used once (replay protection).
+
+**Verified testnet transaction:** [`054283b7de64d361bb2027bf95a973f9ee14676dd0218ad1e293f1aba1f8402e`](https://testnet.cspr.live/transaction/054283b7de64d361bb2027bf95a973f9ee14676dd0218ad1e293f1aba1f8402e)
 
 ---
 
 ## Status
 
-**Live and verified.** Dual-scheme payment gate (exact + onchain-proof) is active on Base mainnet. Validated via Agentic.Market/Bazaar — all checks pass. 3 real on-chain USDC payments completed end-to-end.
+**Live and verified.** Dual-scheme payment gate (exact + onchain-proof) is active on Base mainnet. Validated via Agentic.Market/Bazaar — all checks pass. 3 real on-chain USDC payments completed end-to-end. Casper CSPR payment endpoint live on testnet.
 
 ---
 
@@ -59,7 +101,9 @@ npm start
 |--------|------|------|-------|
 | GET | `/` | free | — |
 | GET | `/api/catalog` | free | — |
+| GET | `/casper/info` | free | — |
 | GET | `/api/signal` | x402 V2 | $0.001 USDC |
+| GET | `/casper/signal` | CSPR transfer | 2.5 CSPR |
 
 ---
 
