@@ -350,16 +350,22 @@ async function buildWalletMonitor(opts) {
 
 async function buildGas() {
   const ethRpc = process.env.ETH_RPC_URL || process.env.ALCHEMY_RPC_URL || 'https://ethereum.publicnode.com';
-  const fetchG = async (network, rpcUrl) => {
+  const fetchG = async (rpcUrl) => {
     const r = await fetch(rpcUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_feeHistory', params: ['0x1', 'latest', [50]] }), signal: AbortSignal.timeout(6_000) });
     const j = await r.json();
     const fh = j.result; if (!fh) return null;
     const base = BigInt(fh.baseFeePerGas?.[0] ?? '0x0'), prio = BigInt(fh.reward?.[0]?.[0] ?? '0x0');
     const toGwei = (w) => Math.round(Number(w) / 1e9 * 1000) / 1000;
-    return { network, baseFeeGwei: toGwei(base), priorityFeeGwei: toGwei(prio), totalGwei: toGwei(base + prio) };
+    return { baseFeeGwei: toGwei(base), priorityFeeGwei: toGwei(prio) };
   };
-  const [base, eth] = await Promise.all([fetchG('base', 'https://mainnet.base.org'), fetchG('ethereum', ethRpc)]);
-  return { fetchedAt: new Date().toISOString(), networks: [base, eth].filter(Boolean), note: 'USD cost estimates assume ETH=$3,000.' };
+  const [base, eth] = await Promise.all([fetchG('https://mainnet.base.org'), fetchG(ethRpc)]);
+  return {
+    fetchedAt:               new Date().toISOString(),
+    base_base_fee_gwei:      base?.baseFeeGwei      ?? null,
+    base_priority_fee_gwei:  base?.priorityFeeGwei  ?? null,
+    eth_base_fee_gwei:       eth?.baseFeeGwei       ?? null,
+    eth_priority_fee_gwei:   eth?.priorityFeeGwei   ?? null,
+  };
 }
 
 async function buildDominance() {
