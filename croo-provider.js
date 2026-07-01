@@ -107,12 +107,11 @@ async function buildHistory(opts) {
   const coin = COINS.includes((opts.coin || '').toUpperCase()) ? opts.coin.toUpperCase() : 'USDC';
   const days = Math.min(parseInt(opts.days, 10) || 7, 30);
   const slug = COIN_TO_SLUG[coin] ?? coin.toLowerCase();
-  const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
-  const url = `https://pegcheck.uk/api/v1/coins/${slug}/history?from=${encodeURIComponent(from)}`;
+  const url = `https://pegcheck.uk/api/price-history?slug=${slug}&days=${days}`;
   const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
   if (!res.ok) throw new Error(`PegCheck history returned ${res.status}`);
   const data = await res.json();
-  return { fetchedAt: new Date().toISOString(), coin, slug, days, ...data };
+  return { fetchedAt: new Date().toISOString(), coin, slug, days, history: data.history ?? [] };
 }
 
 async function buildWhales() {
