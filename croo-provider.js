@@ -98,12 +98,21 @@ async function buildFearGreed() {
   };
 }
 
+const COIN_TO_SLUG = {
+  USDC: 'usdc', USDT: 'usdt', DAI: 'dai',
+  FRAX: 'frax', LUSD: 'lusd', DOLA: 'dola', PYUSD: 'pyusd',
+};
+
 async function buildHistory(opts) {
   const coin = COINS.includes((opts.coin || '').toUpperCase()) ? opts.coin.toUpperCase() : 'USDC';
   const days = Math.min(parseInt(opts.days, 10) || 7, 30);
-  const res = await fetch(`${PEGCHECK_HISTORY}?coin=${coin}&days=${days}`, { signal: AbortSignal.timeout(10_000) });
+  const slug = COIN_TO_SLUG[coin] ?? coin.toLowerCase();
+  const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const url = `https://pegcheck.uk/api/v1/coins/${slug}/history?from=${encodeURIComponent(from)}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
   if (!res.ok) throw new Error(`PegCheck history returned ${res.status}`);
-  return { fetchedAt: new Date().toISOString(), coin, days, history: await res.json() };
+  const data = await res.json();
+  return { fetchedAt: new Date().toISOString(), coin, slug, days, ...data };
 }
 
 async function buildWhales() {
