@@ -111,7 +111,8 @@ async function buildHistory(opts) {
   const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
   if (!res.ok) throw new Error(`PegCheck history returned ${res.status}`);
   const data = await res.json();
-  return { fetchedAt: new Date().toISOString(), coin, slug, days, history: data.history ?? [] };
+  const history = Object.fromEntries((data.history ?? []).slice(0, 100).map((h, i) => [String(i), h]));
+  return { fetchedAt: new Date().toISOString(), coin, slug, days, history };
 }
 
 async function buildWhales() {
