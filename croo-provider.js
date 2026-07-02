@@ -266,7 +266,8 @@ async function buildEdgar() {
   }));
   const seen = new Set();
   const filings = results.flat().filter((f) => { const k = `${f.company}|${f.filedAt}|${f.formType}`; if (seen.has(k)) return false; seen.add(k); return true; }).sort((a, b) => (b.filedAt ?? '').localeCompare(a.filedAt ?? '')).slice(0, 20);
-  return { fetchedAt: new Date().toISOString(), source: 'SEC EDGAR', count: filings.length, filings };
+  const filingsObj = Object.fromEntries(filings.map((f, i) => [String(i), f]));
+  return { fetchedAt: new Date().toISOString(), source: 'SEC EDGAR', count: filings.length, filings: filingsObj };
 }
 
 async function buildMacro() {
