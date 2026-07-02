@@ -388,7 +388,8 @@ async function buildDominance() {
   const top10 = assets.map((a) => ({ symbol: a.symbol, marketCapUsd: Math.round(a.circulating?.peggedUSD ?? 0), sharePct: totalStable ? Math.round((a.circulating?.peggedUSD ?? 0) / totalStable * 10000) / 100 : null })).sort((a, b) => b.marketCapUsd - a.marketCapUsd).slice(0, 10);
   const prev = assets.reduce((s, a) => s + (a.circulatingPrevDay?.peggedUSD ?? a.circulating?.peggedUSD ?? 0), 0);
   const chg = totalStable - prev;
-  return { fetchedAt: new Date().toISOString(), stablecoinMarketCapUsd: Math.round(totalStable), totalCryptoMarketCapUsd: totalCrypto ? Math.round(totalCrypto) : null, dominancePct: totalCrypto ? Math.round((totalStable / totalCrypto) * 10000) / 100 : null, change24hUsd: Math.round(chg), change24hPct: prev > 0 ? Math.round((chg / prev) * 10000) / 100 : null, trend: chg > 0 ? 'EXPANDING' : chg < 0 ? 'CONTRACTING' : 'STABLE', topStablecoins: top10 };
+  const topStablecoins = Object.fromEntries(top10.map((c) => [c.symbol, { marketCapUsd: c.marketCapUsd, sharePct: c.sharePct }]));
+  return { fetchedAt: new Date().toISOString(), stablecoinMarketCapUsd: Math.round(totalStable), totalCryptoMarketCapUsd: totalCrypto ? Math.round(totalCrypto) : null, dominancePct: totalCrypto ? Math.round((totalStable / totalCrypto) * 10000) / 100 : null, change24hUsd: Math.round(chg), change24hPct: prev > 0 ? Math.round((chg / prev) * 10000) / 100 : null, trend: chg > 0 ? 'EXPANDING' : chg < 0 ? 'CONTRACTING' : 'STABLE', topStablecoins };
 }
 
 async function buildProtocolRisk(opts) {
