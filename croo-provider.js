@@ -587,6 +587,8 @@ async function init() {
     console.warn('[croo-1] CROO_SDK_KEY not set — provider disabled');
   }
 
+  await new Promise((resolve) => setTimeout(resolve, 3_000));
+
   if (process.env.CROO_SDK_KEY_2) {
     supervisedProvider(process.env.CROO_SDK_KEY_2, ID_TO_KEY_2, 'croo-2')
       .catch((err) => console.error('[croo-2] supervisor crashed:', err.message));
