@@ -307,7 +307,9 @@ async function buildProofOfReserve(opts) {
     return { answer: BigInt('0x' + hex.slice(64, 128)), updatedAt: new Date(Number(BigInt('0x' + hex.slice(192, 256))) * 1000).toISOString() };
   };
   const [rv, sv] = await Promise.all([readFeed(feed.reserves), readFeed(feed.totalSupply)]);
-  if (!rv || !sv) throw new Error('Failed to read Chainlink PoR feeds');
+  if (!rv || !sv) {
+    return { fetchedAt: new Date().toISOString(), coin, source: 'Chainlink Proof of Reserve', chain: 'ethereum', status: 'UNAVAILABLE', error: 'Chainlink PoR feed returned no data — feed may be deprecated or RPC unavailable' };
+  }
   const d = 10n ** BigInt(feed.decimals);
   const res = Number(rv.answer) / Number(d), sup = Number(sv.answer) / Number(d);
   const ratio = sup > 0 ? Math.round((res / sup) * 10000) / 10000 : null;
