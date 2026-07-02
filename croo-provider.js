@@ -340,8 +340,7 @@ async function buildStressTest(opts) {
     for (const [c, u] of Object.entries(portfolio)) { const p = s.prices[c] ?? 1; const st = u * p; sv += st; cb[c] = { holdingUsd: u, stressPrice: p, stressedUsd: Math.round(st * 100) / 100, lossUsd: Math.round((u - st) * 100) / 100, lossPct: Math.round((1 - p) * 10000) / 100 }; }
     return { scenarioId: s.id, name: s.name, description: s.description, portfolioLossUsd: Math.round((pv - sv) * 100) / 100, portfolioLossPct: Math.round(((pv - sv) / pv) * 10000) / 100, stressedValueUsd: Math.round(sv * 100) / 100, coinBreakdown: cb };
   }).sort((a, b) => b.portfolioLossUsd - a.portfolioLossUsd);
-  const worst = scenarios[0];
-  return { fetchedAt: new Date().toISOString(), portfolio, portfolioValueUsd: pv, worstScenario: { name: worst.name, lossUsd: worst.portfolioLossUsd, lossPct: worst.portfolioLossPct }, scenarios };
+  return { fetchedAt: new Date().toISOString(), portfolio, portfolioValueUsd: pv };
 }
 
 async function buildWalletMonitor(opts) {
