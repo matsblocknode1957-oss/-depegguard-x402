@@ -542,20 +542,56 @@ async function createProvider(sdkKey, idToKey, label) {
   return stream;
 }
 
-async function init() {
-  const results = await Promise.allSettled([
-    process.env.CROO_SDK_KEY
-      ? createProvider(process.env.CROO_SDK_KEY,   ID_TO_KEY_1, 'croo-1')
-      : Promise.resolve(console.warn('[croo-1] CROO_SDK_KEY not set — provider disabled')),
-    process.env.CROO_SDK_KEY_2
-      ? createProvider(process.env.CROO_SDK_KEY_2, ID_TO_KEY_2, 'croo-2')
-      : Promise.resolve(console.warn('[croo-2] CROO_SDK_KEY_2 not set — provider disabled')),
-  ]);
+// Supervisor: restarts createProvider when the SDK refuses to reconnect (e.g.
+// 1008 duplicate-key rejection during a rolling deploy). The SDK handles all
+// normal disconnects internally; we only need to act when stream.err() is set.
+async function supervisedProvider(sdkKey, idToKey, label) {
+  let attempt = 0;
 
-  for (const r of results) {
-    if (r.status === 'rejected') {
-      console.error('[croo] a provider failed to start:', r.reason?.message);
+  while (true) {
+    let stream = null;
+    try {
+      stream = await createProvider(sdkKey, idToKey, label);
+      attempt = 0; // reset backoff on successful connect
+
+      // Poll until the SDK marks the stream as fatally errored.
+      // Normal disconnects are retried inside the SDK; we only land here for
+      // errors the SDK won't recover from (duplicate key 1008, etc.).
+      await new Promise((resolve) => {
+        const id = setInterval(() => {
+          if (stream.err()) { clearInterval(id); resolve(); }
+        }, 5_000);
+      });
+
+      console.error(`[${label}] stream fatal: ${stream.err().message}`);
+    } catch (err) {
+      console.error(`[${label}] connect error: ${err.message}`);
+    } finally {
+      if (stream) { try { stream.close(); } catch {} }
     }
+
+    // Exponential backoff: 15 s base (lets old Railway instance die), max 120 s.
+    // 1008 during rolling deploy: old instance typically exits within 15–30 s.
+    const delay = Math.min(15_000 * Math.pow(2, attempt), 120_000);
+    attempt++;
+    console.log(`[${label}] restarting in ${Math.round(delay / 1000)}s (attempt ${attempt})…`);
+    await new Promise((resolve) => setTimeout(resolve, delay));
+  }
+}
+
+async function init() {
+  if (process.env.CROO_SDK_KEY) {
+    supervisedProvider(process.env.CROO_SDK_KEY, ID_TO_KEY_1, 'croo-1')
+      .catch((err) => console.error('[croo-1] supervisor crashed:', err.message));
+  } else {
+    console.warn('[croo-1] CROO_SDK_KEY not set — provider disabled');
+  }
+
+  if (process.env.CROO_SDK_KEY_2) {
+    supervisedProvider(process.env.CROO_SDK_KEY_2, ID_TO_KEY_2, 'croo-2')
+      .catch((err) => console.error('[croo-2] supervisor crashed:', err.message));
+  } else {
+    console.warn('[croo-2] CROO_SDK_KEY_2 not set — provider disabled');
   }
 }
 

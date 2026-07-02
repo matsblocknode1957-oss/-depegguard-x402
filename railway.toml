@@ -1,0 +1,5 @@
+[deploy]
+numReplicas = 1
+startCommand = "npm start"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 10
