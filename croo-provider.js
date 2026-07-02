@@ -251,7 +251,8 @@ async function buildYield() {
     .sort((a, b) => b.apy - a.apy);
   const best = {};
   for (const p of filtered) if (!best[p.project]) best[p.project] = p;
-  return { fetchedAt: new Date().toISOString(), topYield: filtered[0] ?? null, bestByProject: best, allPools: filtered.slice(0, 30) };
+  const allPools = Object.fromEntries(filtered.slice(0, 30).map((p, i) => [String(i), p]));
+  return { fetchedAt: new Date().toISOString(), topYield: filtered[0] ?? null, bestByProject: best, allPools };
 }
 
 async function buildEdgar() {
