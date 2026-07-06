@@ -530,7 +530,7 @@ async function createProvider(sdkKey, idToKey, label) {
       const payload = await BUILDERS[key](opts);
       const result  = await client.deliverOrder(e.order_id, {
         deliverableType: DeliverableType.Schema,
-        deliverableText: JSON.stringify(payload),
+        deliverableSchema: JSON.stringify(payload),
       });
       console.log(`[${label}] order ${e.order_id} delivered, tx: ${result.txHash}`);
     } catch (err) {
