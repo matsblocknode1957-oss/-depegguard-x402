@@ -2,6 +2,10 @@
 
 const MAX_ADDRESSES = 5;
 
+function isValidAddress(addr) {
+  return typeof addr === 'string' && /^0x[0-9a-fA-F]{40}$/i.test(addr);
+}
+
 // Call an existing route handler with a mock req/res, capture JSON output
 function callRoute(handler, query) {
   return new Promise((resolve, reject) => {
@@ -52,8 +56,7 @@ async function portfolioReportHandler(req, res) {
     return res.status(400).json({ error: 'Required: ?addresses=0x…,0x… (comma-separated, up to 5)' });
   }
 
-  const { isAddress } = await import('viem');
-  const addresses = raw.slice(0, MAX_ADDRESSES).filter((a) => isAddress(a));
+  const addresses = raw.slice(0, MAX_ADDRESSES).filter((a) => isValidAddress(a));
   if (addresses.length === 0) {
     return res.status(400).json({ error: 'No valid EVM addresses provided' });
   }
