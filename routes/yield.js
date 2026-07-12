@@ -43,7 +43,7 @@ async function yieldHandler(req, res) {
     fetchedAt:   new Date().toISOString(),
     topYield:    filtered[0] ?? null,
     bestByProject: best,
-    allPools:    filtered.slice(0, 30),
+    allPools:    Object.fromEntries(filtered.slice(0, 30).map((p, i) => [String(i), p])),
   });
 }
 

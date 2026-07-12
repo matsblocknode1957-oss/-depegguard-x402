@@ -41,7 +41,7 @@ async function tvlRiskHandler(req, res) {
       : absPct > 10
       ? 'Elevated TVL movement — monitor closely'
       : 'TVL stable',
-    chainBreakdown: chains,
+    chainBreakdown: Object.fromEntries(chains.map((c) => [c.chain, c])),
   });
 }
 

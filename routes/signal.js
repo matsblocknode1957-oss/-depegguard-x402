@@ -10,11 +10,12 @@ async function signalHandler(req, res) {
     return acc;
   }, {});
 
+  const toObj = (arr) => Object.fromEntries(arr.map((s, i) => [String(i), s]));
   const summary = {
-    EXIT: results.filter((r) => r.signal === 'EXIT').map((r) => r.symbol),
-    HEDGE: results.filter((r) => r.signal === 'HEDGE').map((r) => r.symbol),
-    STABLE: results.filter((r) => r.signal === 'STABLE').map((r) => r.symbol),
-    UNKNOWN: results.filter((r) => r.signal === 'UNKNOWN').map((r) => r.symbol),
+    EXIT:    toObj(results.filter((r) => r.signal === 'EXIT').map((r) => r.symbol)),
+    HEDGE:   toObj(results.filter((r) => r.signal === 'HEDGE').map((r) => r.symbol)),
+    STABLE:  toObj(results.filter((r) => r.signal === 'STABLE').map((r) => r.symbol)),
+    UNKNOWN: toObj(results.filter((r) => r.signal === 'UNKNOWN').map((r) => r.symbol)),
   };
 
   res.json({

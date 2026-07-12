@@ -77,7 +77,7 @@ async function protocolComparisonHandler(req, res) {
   res.json({
     fetchedAt:  new Date().toISOString(),
     protocols:  Object.fromEntries(compared.map((p) => [p.protocol, p])),
-    ranking:    ranked.map((p) => p.protocol),
+    ranking:    Object.fromEntries(ranked.map((p, i) => [String(i), p.protocol])),
     safest:     ranked[0].protocol,
     riskiest:   ranked[ranked.length - 1].protocol,
     systemWide: { liquidationStress: liqStress, pegStress },

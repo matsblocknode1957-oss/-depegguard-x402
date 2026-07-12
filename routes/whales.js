@@ -10,7 +10,7 @@ async function fetchWhaleAlertTransfers() {
     source: 'whale-alert',
     windowHours: 1,
     minValueUsd: 1_000_000,
-    transfers: (data.transactions || []).map((tx) => ({
+    transfers: Object.fromEntries((data.transactions || []).map((tx, i) => [String(i), {
       blockchain: tx.blockchain,
       from: tx.from?.address || tx.from?.owner_type || 'unknown',
       to: tx.to?.address || tx.to?.owner_type || 'unknown',
@@ -18,7 +18,7 @@ async function fetchWhaleAlertTransfers() {
       symbol: tx.symbol?.toUpperCase(),
       timestamp: new Date(tx.timestamp * 1000).toISOString(),
       txHash: tx.hash,
-    })),
+    }])),
   };
 }
 
@@ -41,7 +41,7 @@ async function fetchLlamaFlows() {
   return {
     source: 'defillama-flows',
     note: 'Aggregate 24h circulating supply changes. Set WHALE_ALERT_KEY env var for individual transfer data.',
-    movers,
+    movers: Object.fromEntries(movers.map((m, i) => [String(i), m])),
   };
 }
 

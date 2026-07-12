@@ -40,7 +40,7 @@ async function dominanceHandler(req, res) {
     change24hUsd:          Math.round(change24hUsd),
     change24hPct,
     trend:                 change24hUsd > 0 ? 'EXPANDING' : change24hUsd < 0 ? 'CONTRACTING' : 'STABLE',
-    topStablecoins:        top10,
+    topStablecoins:        Object.fromEntries(top10.map((c) => [c.symbol, c])),
   });
 }
 

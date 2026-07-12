@@ -100,7 +100,7 @@ async function stressTestHandler(req, res) {
       lossUsd:  worst.portfolioLossUsd,
       lossPct:  worst.portfolioLossPct,
     },
-    scenarios: scenarioResults,
+    scenarios: Object.fromEntries(scenarioResults.map((s) => [s.scenarioId, s])),
   });
 }
 

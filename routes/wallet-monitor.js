@@ -179,7 +179,7 @@ async function walletMonitorHandler(req, res) {
       ethPriceUsd:       ethPrice,
       overallRisk:       worstHf != null ? riskLevel(worstHf) : 'NO_POSITIONS',
       worstHealthFactor: worstHf,
-      positions,
+      positions: Object.fromEntries(positions.map((p) => [p.protocol, p])),
     });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch positions', detail: err.message });

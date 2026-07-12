@@ -50,7 +50,7 @@ async function gasHandler(req, res) {
 
   res.json({
     fetchedAt: new Date().toISOString(),
-    networks: [base, ethereum].filter(Boolean),
+    networks: Object.fromEntries([base, ethereum].filter(Boolean).map((n) => [n.network, n])),
     note: 'baseFeeGwei + priorityFeeGwei = totalGwei. USD cost estimates assume ETH=$3,000.',
   });
 }

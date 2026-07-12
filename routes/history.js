@@ -17,7 +17,10 @@ async function historyHandler(req, res) {
   if (!response.ok) throw new Error(`PegCheck history returned ${response.status}`);
   const data = await response.json();
 
-  res.json({ fetchedAt: new Date().toISOString(), coin, days, history: data });
+  const history = Array.isArray(data)
+    ? Object.fromEntries(data.map((e, i) => [String(i), e]))
+    : data;
+  res.json({ fetchedAt: new Date().toISOString(), coin, days, history });
 }
 
 module.exports = historyHandler;

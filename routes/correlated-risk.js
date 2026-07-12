@@ -20,7 +20,7 @@ async function correlatedRiskHandler(req, res) {
     composite: data.composite,
     corrScore: data.corrScore,
     riskLevel: riskLevel(data.composite ?? 0),
-    correlatedCoins: data.correlatedCoins || [],
+    correlatedCoins: Object.fromEntries((data.correlatedCoins || []).map((c, i) => [String(i), c])),
     pegStress: data.pegStress,
     liquidationStress: data.liquidationStress,
     flowPressure: data.flowPressure,

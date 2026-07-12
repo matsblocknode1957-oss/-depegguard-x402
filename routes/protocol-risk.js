@@ -90,8 +90,8 @@ async function protocolRiskHandler(req, res) {
       depegSignals: {
         score:     depegScore,
         weight:    '15%',
-        exitCoins: pegResults.filter((r) => r.signal === 'EXIT').map((r) => r.symbol),
-        hedgeCoins: pegResults.filter((r) => r.signal === 'HEDGE').map((r) => r.symbol),
+        exitCoins:  Object.fromEntries(pegResults.filter((r) => r.signal === 'EXIT').map((r, i)  => [String(i), r.symbol])),
+        hedgeCoins: Object.fromEntries(pegResults.filter((r) => r.signal === 'HEDGE').map((r, i) => [String(i), r.symbol])),
       },
     },
   });

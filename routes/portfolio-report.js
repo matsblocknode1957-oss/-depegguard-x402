@@ -104,7 +104,7 @@ async function portfolioReportHandler(req, res) {
       positionRiskScore:  positionRisk,
       liquidationPrices,
       mostAtRisk:         liq.mostAtRisk ?? null,
-      positions:          monitor.positions ?? [],
+      positions:          Object.fromEntries((monitor.positions ?? []).map((p) => [p.protocol, p])),
       error:              monitor.error ?? liq.error ?? null,
     };
   });
@@ -146,7 +146,7 @@ async function portfolioReportHandler(req, res) {
     riskLevel:           riskLevel(portfolioScore),
     walletsChecked:      wallets.length,
     worstAddress:        worstWallet?.address ?? null,
-    wallets,
+    wallets: Object.fromEntries(wallets.map((w) => [w.address, w])),
     systemRisk: {
       score:              systemScore,
       correlatedRisk:     correlatedScore,

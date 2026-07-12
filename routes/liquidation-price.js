@@ -226,7 +226,7 @@ async function liquidationPriceHandler(req, res) {
       address,
       currentEthPrice: ethPrice,
       mostAtRisk:      highest ? { protocol: highest.protocol, liquidationPriceUsd: highest.liquidationPriceUsd, safetyBuffer: highest.safetyBuffer } : null,
-      positions,
+      positions: Object.fromEntries(positions.map((p) => [p.protocol, p])),
       note: 'Liquidation prices assume ETH-denominated collateral. Mixed collateral positions may differ.',
     });
   } catch (err) {

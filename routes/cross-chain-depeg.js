@@ -90,7 +90,7 @@ async function crossChainDepegHandler(req, res) {
     coin,
     status:       isDepegged ? 'DEPEGGED' : 'STABLE',
     maxDeviationPct: maxDeviation != null ? Math.round(maxDeviation * 10000) / 100 : null,
-    chains,
+    chains: Object.fromEntries(chains.map((c) => [c.chain, c])),
     note: 'Prices sourced from Chainlink on-chain feeds per network.',
   });
 }

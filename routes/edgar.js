@@ -55,7 +55,7 @@ async function edgarHandler(req, res) {
     fetchedAt: new Date().toISOString(),
     source:    'SEC EDGAR',
     count:     filings.length,
-    filings,
+    filings: Object.fromEntries(filings.map((f, i) => [String(i), f])),
   });
 }
 

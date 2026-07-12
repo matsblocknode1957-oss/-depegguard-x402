@@ -32,7 +32,7 @@ async function liquidationRiskHandler(req, res) {
     pegStress: risk.pegStress ?? null,
     composite: risk.composite ?? null,
     tvlUsd: typeof tvlUsd === 'number' ? tvlUsd : null,
-    sources: ['fintechcheck', 'defillama'],
+    sources: { '0': 'fintechcheck', '1': 'defillama' },
   });
 }
 
