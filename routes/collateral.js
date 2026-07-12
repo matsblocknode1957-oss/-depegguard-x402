@@ -26,6 +26,10 @@ function riskLevel(hf) {
   return 'LIQUIDATABLE';
 }
 
+function isValidAddress(addr) {
+  return typeof addr === 'string' && /^0x[0-9a-fA-F]{40}$/i.test(addr);
+}
+
 async function collateralHandler(req, res) {
   const { address, protocol = 'aave' } = req.query;
 
@@ -35,30 +39,30 @@ async function collateralHandler(req, res) {
   if (protocol.toLowerCase() !== 'aave') {
     return res.status(400).json({ error: 'Currently only protocol=aave is supported' });
   }
-
-  // Dynamic import so viem ESM works from this CJS module
-  const { createPublicClient, http, isAddress } = await import('viem');
-  const { base } = await import('viem/chains');
-
-  if (!isAddress(address)) {
+  if (!isValidAddress(address)) {
     return res.status(400).json({ error: 'Invalid EVM address' });
   }
 
-  const client = createPublicClient({
-    chain: base,
-    transport: http(process.env.BASE_RPC_URL || 'https://mainnet.base.org'),
-  });
+  try {
+    // Dynamic import required: viem is ESM-only and this is a CJS module
+    const { createPublicClient, http } = await import('viem');
+    const { base } = await import('viem/chains');
 
-  const [col, debt, borrows, liqThresh, ltv, hf] = await client.readContract({
-    address: AAVE_V3_POOL_BASE,
-    abi: GET_USER_ACCOUNT_DATA_ABI,
-    functionName: 'getUserAccountData',
-    args: [address],
-  });
+    const client = createPublicClient({
+      chain: base,
+      transport: http(process.env.BASE_RPC_URL || 'https://mainnet.base.org'),
+    });
 
-  const hfNum = Number(hf) / 1e18;
+    const [col, debt, borrows, liqThresh, ltv, hf] = await client.readContract({
+      address: AAVE_V3_POOL_BASE,
+      abi: GET_USER_ACCOUNT_DATA_ABI,
+      functionName: 'getUserAccountData',
+      args: [address],
+    });
 
-  res.json({
+    const hfNum = Number(hf) / 1e18;
+
+    res.json({
     fetchedAt: new Date().toISOString(),
     protocol: 'aave-v3',
     chain: 'base',
@@ -69,8 +73,11 @@ async function collateralHandler(req, res) {
     liquidationThresholdPct:  Number(liqThresh) / 100,
     ltvPct:                   Number(ltv)       / 100,
     healthFactor:             hfNum,
-    riskLevel:                riskLevel(hfNum),
-  });
+      riskLevel:                riskLevel(hfNum),
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch collateral data', detail: err.message });
+  }
 }
 
 module.exports = collateralHandler;

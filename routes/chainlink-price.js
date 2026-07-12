@@ -33,6 +33,7 @@ async function chainlinkPriceHandler(req, res) {
 
   const rpcUrl = process.env.ETH_RPC_URL || process.env.ALCHEMY_RPC_URL || 'https://ethereum.publicnode.com';
 
+  try {
   const rpcRes = await fetch(rpcUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -65,9 +66,12 @@ async function chainlinkPriceHandler(req, res) {
     staleSeconds: staleSecs,
     isStale:    staleSecs > 3600, // flag if data older than 1 hour
     feedAddress: feed.address,
-    chain:      'ethereum',
-    source:     'Chainlink',
-  });
+      chain:      'ethereum',
+      source:     'Chainlink',
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch Chainlink price', detail: err.message });
+  }
 }
 
 module.exports = chainlinkPriceHandler;

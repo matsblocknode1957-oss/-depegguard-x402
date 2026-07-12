@@ -62,6 +62,7 @@ async function crossChainDepegHandler(req, res) {
 
   const rpcs = getRpcUrls();
 
+  try {
   const [ethereum, base, arbitrum] = await Promise.all([
     readFeed(feeds.ethereum, rpcs.ethereum),
     readFeed(feeds.base,     rpcs.base),
@@ -93,6 +94,9 @@ async function crossChainDepegHandler(req, res) {
     chains: Object.fromEntries(chains.map((c) => [c.chain, c])),
     note: 'Prices sourced from Chainlink on-chain feeds per network.',
   });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch cross-chain prices', detail: err.message });
+  }
 }
 
 module.exports = crossChainDepegHandler;

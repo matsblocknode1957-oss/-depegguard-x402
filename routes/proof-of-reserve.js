@@ -48,21 +48,22 @@ async function porHandler(req, res) {
 
   const rpcUrl = process.env.ETH_RPC_URL || 'https://ethereum.publicnode.com';
 
-  const [reservesData, supplyData] = await Promise.all([
-    readFeed(feed.reserves,    rpcUrl),
-    readFeed(feed.totalSupply, rpcUrl),
-  ]);
+  try {
+    const [reservesData, supplyData] = await Promise.all([
+      readFeed(feed.reserves,    rpcUrl),
+      readFeed(feed.totalSupply, rpcUrl),
+    ]);
 
-  if (!reservesData || !supplyData) {
-    throw new Error('Failed to read Chainlink PoR feeds — RPC may be unavailable');
-  }
+    if (!reservesData || !supplyData) {
+      return res.status(502).json({ error: 'Failed to read Chainlink PoR feeds — RPC may be unavailable' });
+    }
 
-  const divisor = 10n ** BigInt(feed.decimals);
-  const reservesNum = Number(reservesData.answer) / Number(divisor);
-  const supplyNum   = Number(supplyData.answer)   / Number(divisor);
-  const ratio       = supplyNum > 0 ? reservesNum / supplyNum : null;
+    const divisor = 10n ** BigInt(feed.decimals);
+    const reservesNum = Number(reservesData.answer) / Number(divisor);
+    const supplyNum   = Number(supplyData.answer)   / Number(divisor);
+    const ratio       = supplyNum > 0 ? reservesNum / supplyNum : null;
 
-  res.json({
+    res.json({
     fetchedAt:        new Date().toISOString(),
     coin,
     source:           'Chainlink Proof of Reserve',
@@ -72,8 +73,11 @@ async function porHandler(req, res) {
     reserveRatio:     ratio != null ? Math.round(ratio * 10000) / 10000 : null,
     status:           ratio == null ? 'UNKNOWN' : ratio >= 1 ? 'BACKED' : 'UNDERBACKED',
     reservesUpdatedAt: reservesData.updatedAt,
-    supplyUpdatedAt:   supplyData.updatedAt,
-  });
+      supplyUpdatedAt:   supplyData.updatedAt,
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch proof of reserve data', detail: err.message });
+  }
 }
 
 module.exports = porHandler;

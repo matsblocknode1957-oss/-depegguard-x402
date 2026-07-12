@@ -11,8 +11,9 @@ function riskLevel(composite) {
 }
 
 async function correlatedRiskHandler(req, res) {
+  try {
   const response = await fetch(`${FINTECHCHECK}/api/risk`, { signal: AbortSignal.timeout(8_000) });
-  if (!response.ok) throw new Error(`FintechCheck returned ${response.status}`);
+  if (!response.ok) return res.status(502).json({ error: `FintechCheck returned ${response.status}` });
   const data = await response.json();
 
   res.json({
@@ -27,6 +28,9 @@ async function correlatedRiskHandler(req, res) {
     perCoin: data.perCoin || {},
     dataTimestamp: new Date(data.timestamp).toISOString(),
   });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch correlated risk data', detail: err.message });
+  }
 }
 
 module.exports = correlatedRiskHandler;

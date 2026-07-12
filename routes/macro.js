@@ -36,8 +36,9 @@ function stablecoinContext(ffr, cpi, t2y) {
 
 async function macroHandler(req, res) {
   const apiKey = process.env.FRED_API_KEY;
-  if (!apiKey) throw new Error('FRED_API_KEY not configured');
+  if (!apiKey) return res.status(500).json({ error: 'FRED_API_KEY not configured' });
 
+  try {
   const [ffr, cpi, t2y, sofr, m2] = await Promise.all([
     fetchSeries(SERIES.federalFundsRate, apiKey),
     fetchSeries(SERIES.cpi,             apiKey),
@@ -57,6 +58,9 @@ async function macroHandler(req, res) {
     },
     stablecoinContext: stablecoinContext(ffr, cpi, t2y),
   });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch macro data', detail: err.message });
+  }
 }
 
 module.exports = macroHandler;

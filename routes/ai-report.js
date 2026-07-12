@@ -80,23 +80,31 @@ async function fetchAddressData(address) {
   };
 }
 
+function isValidAddress(addr) {
+  return typeof addr === 'string' && /^0x[0-9a-fA-F]{40}$/i.test(addr);
+}
+
 async function aiReportHandler(req, res) {
   const { protocol, address } = req.query;
 
   if (!protocol && !address) {
     return res.status(400).json({ error: 'Required: ?protocol=aave-v3 OR ?address=0x…' });
   }
-  if (address) {
-    const { isAddress } = await import('viem');
-    if (!isAddress(address)) return res.status(400).json({ error: 'Invalid EVM address' });
+  if (address && !isValidAddress(address)) {
+    return res.status(400).json({ error: 'Invalid EVM address' });
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
+  if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY not configured' });
 
-  const dataSnapshot = protocol
-    ? await fetchProtocolData(protocol)
-    : await fetchAddressData(address);
+  let dataSnapshot;
+  try {
+    dataSnapshot = protocol
+      ? await fetchProtocolData(protocol)
+      : await fetchAddressData(address);
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to fetch DeFi data', detail: err.message });
+  }
 
   let report = null;
   let claudeError = null;

@@ -21,20 +21,24 @@ function interpret(score) {
 }
 
 async function healthIndexHandler(req, res) {
-  const results = await Promise.all(COINS.map(fetchCoin));
-  const total = results.reduce((sum, r) => sum + (SCORE[r.signal] ?? 0), 0);
-  const score = Math.round(total / results.length);
-  const perCoin = results.reduce((acc, r) => {
-    acc[r.symbol] = { signal: r.signal, score: SCORE[r.signal] ?? 0, pegDeviation: r.pegDeviation };
-    return acc;
-  }, {});
-  res.json({
-    fetchedAt: new Date().toISOString(),
-    healthIndex: score,
-    grade: grade(score),
-    interpretation: interpret(score),
-    perCoin,
-  });
+  try {
+    const results = await Promise.all(COINS.map(fetchCoin));
+    const total = results.reduce((sum, r) => sum + (SCORE[r.signal] ?? 0), 0);
+    const score = Math.round(total / results.length);
+    const perCoin = results.reduce((acc, r) => {
+      acc[r.symbol] = { signal: r.signal, score: SCORE[r.signal] ?? 0, pegDeviation: r.pegDeviation };
+      return acc;
+    }, {});
+    res.json({
+      fetchedAt: new Date().toISOString(),
+      healthIndex: score,
+      grade: grade(score),
+      interpretation: interpret(score),
+      perCoin,
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to compute health index', detail: err.message });
+  }
 }
 
 module.exports = healthIndexHandler;
