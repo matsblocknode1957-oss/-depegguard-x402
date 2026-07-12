@@ -1,8 +1,7 @@
 'use strict';
 
-// Ethereum mainnet contract addresses
-const AAVE_POOL      = '0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2';
-const COMPOUND_COMET = '0xc3d688B66703497DAA19211EEdff47f25384cdc3';
+const AAVE_POOL         = '0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2';
+const COMPOUND_COMET    = '0xc3d688B66703497DAA19211EEdff47f25384cdc3';
 const MAKER_PROXY_REG   = '0x4678f0a6958e4D2Bc4F1BAF7Bc52E8F3564f3fE4';
 const MAKER_CDP_MANAGER = '0x5ef30b9986345249bc32d8928B7ee64DE9435E39';
 const MAKER_VAT         = '0x35D1b3F3D7966A1DFe207aa4514C12a259A0492B';
@@ -23,12 +22,17 @@ function getRpcUrl() {
   return process.env.ETH_RPC_URL || process.env.ALCHEMY_RPC_URL || 'https://ethereum.publicnode.com';
 }
 
+// Module-level address check — avoids a dynamic viem import on every request
+function isValidAddress(addr) {
+  return typeof addr === 'string' && /^0x[0-9a-fA-F]{40}$/i.test(addr);
+}
+
 async function rpcCall(to, data, rpcUrl) {
   const res = await fetch(rpcUrl, {
-    method: 'POST',
+    method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to, data }, 'latest'] }),
-    signal: AbortSignal.timeout(8_000),
+    body:    JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to, data }, 'latest'] }),
+    signal:  AbortSignal.timeout(8_000),
   });
   const json = await res.json();
   return json.result ?? null;
@@ -45,7 +49,7 @@ async function fetchAave(address, rpcUrl) {
   const padded = address.toLowerCase().replace('0x', '').padStart(64, '0');
   const result = await rpcCall(AAVE_POOL, '0xbf92857c' + padded, rpcUrl);
   if (!result || result === '0x') return null;
-  const hex = result.replace('0x', '');
+  const hex   = result.replace('0x', '');
   const chunk = (i) => BigInt('0x' + hex.slice(i * 64, (i + 1) * 64));
   const collateralUsd = Number(chunk(0)) / 1e8;
   const debtUsd       = Number(chunk(1)) / 1e8;
@@ -58,16 +62,16 @@ async function fetchCompound(address, rpcUrl) {
   const padded = address.toLowerCase().replace('0x', '').padStart(64, '0');
   const [brRes, lrRes] = await Promise.all([
     fetch(rpcUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: COMPOUND_COMET, data: '0x374c49b4' + padded }, 'latest'] }),
+      body:   JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: COMPOUND_COMET, data: '0x374c49b4' + padded }, 'latest'] }),
       signal: AbortSignal.timeout(8_000) }),
     fetch(rpcUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'eth_call', params: [{ to: COMPOUND_COMET, data: '0x5e96c5ce' + padded }, 'latest'] }),
+      body:   JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'eth_call', params: [{ to: COMPOUND_COMET, data: '0x5e96c5ce' + padded }, 'latest'] }),
       signal: AbortSignal.timeout(8_000) }),
   ]);
   const [bj, lj] = await Promise.all([brRes.json(), lrRes.json()]);
   const debtUsd = Number(BigInt(bj.result || '0x0')) / 1e6;
   if (debtUsd === 0) return null;
-  const raw = BigInt(lj.result || '0x0');
+  const raw    = BigInt(lj.result || '0x0');
   const TWO256 = BigInt('0x10000000000000000000000000000000000000000000000000000000000000000');
   const signed = raw > TWO256 / 2n - 1n ? raw - TWO256 : raw;
   const liquidityUsd = Number(signed) / 1e6;
@@ -80,29 +84,33 @@ async function fetchMaker(address, ethPriceUsd, rpcUrl) {
   const paddedWallet  = address.toLowerCase().replace('0x', '').padStart(64, '0');
   const paddedManager = MAKER_CDP_MANAGER.replace('0x', '').padStart(64, '0');
 
-  const proxyRaw = await rpcCall(MAKER_PROXY_REG, '0xc4552791' + paddedWallet, rpcUrl);
+  // Proxy registry lookup
+  const proxyRaw  = await rpcCall(MAKER_PROXY_REG, '0xc4552791' + paddedWallet, rpcUrl);
   const proxyAddr = proxyRaw && proxyRaw !== '0x' ? '0x' + proxyRaw.slice(-40) : null;
   const candidates = [...new Set([proxyAddr, address].filter((a) => a && a !== ZERO_ADDR))];
 
-  let cdpsRaw = null;
-  for (const addr of candidates) {
-    const padded = addr.replace('0x', '').padStart(64, '0');
-    const r = await rpcCall(MAKER_GET_CDPS, '0x1ce03f38' + paddedManager + padded, rpcUrl);
-    if (r && r !== '0x' && r.length > 2) { cdpsRaw = r; break; }
-  }
+  // CDP list — query all candidates in parallel, take the first non-empty result
+  const cdpResults = await Promise.all(
+    candidates.map((addr) => {
+      const padded = addr.replace('0x', '').padStart(64, '0');
+      return rpcCall(MAKER_GET_CDPS, '0x1ce03f38' + paddedManager + padded, rpcUrl)
+        .catch(() => null);
+    })
+  );
+  const cdpsRaw = cdpResults.find((r) => r && r !== '0x' && r.length > 2) ?? null;
   if (!cdpsRaw) return null;
 
-  const hex    = cdpsRaw.replace('0x', '');
-  const wordN  = (i) => Number(BigInt('0x' + hex.slice(i * 64, (i + 1) * 64)));
-  const off1 = wordN(0) / 32, off2 = wordN(1) / 32, off3 = wordN(2) / 32;
-  const len = wordN(off1);
+  const hex   = cdpsRaw.replace('0x', '');
+  const wordN = (i) => Number(BigInt('0x' + hex.slice(i * 64, (i + 1) * 64)));
+  const off1  = wordN(0) / 32, off2 = wordN(1) / 32, off3 = wordN(2) / 32;
+  const len   = wordN(off1);
   if (len === 0) return null;
 
   const cdps = [];
   for (let i = 0; i < len; i++) {
     const urnWord = off2 + 1 + i;
     const ilkWord = off3 + 1 + i;
-    const urn  = '0x' + hex.slice(urnWord * 64 + 24, urnWord * 64 + 64);
+    const urn    = '0x' + hex.slice(urnWord * 64 + 24, urnWord * 64 + 64);
     const ilkHex = hex.slice(ilkWord * 64, ilkWord * 64 + 64);
     let ilkStr = '';
     for (let j = 0; j < ilkHex.length; j += 2) {
@@ -118,15 +126,15 @@ async function fetchMaker(address, ethPriceUsd, rpcUrl) {
   const resolved = await Promise.all(cdps.map(async ({ urn, ilk }) => {
     const paddedUrn = urn.replace('0x', '').padStart(64, '0');
     const [urnData, ilkData] = await Promise.all([
-      rpcCall(MAKER_VAT, '0x2424be5c' + ilk + paddedUrn, rpcUrl),
-      rpcCall(MAKER_VAT, '0xd9638d36' + ilk, rpcUrl),
+      rpcCall(MAKER_VAT, '0x2424be5c' + ilk + paddedUrn, rpcUrl).catch(() => null),
+      rpcCall(MAKER_VAT, '0xd9638d36' + ilk, rpcUrl).catch(() => null),
     ]);
     if (!urnData || urnData === '0x' || !ilkData || ilkData === '0x') return null;
-    const uh = urnData.replace('0x', '');
+    const uh     = urnData.replace('0x', '');
     const inkBig = BigInt('0x' + uh.slice(0, 64));
     const artBig = BigInt('0x' + uh.slice(64, 128));
     if (artBig === 0n) return null;
-    const ih = ilkData.replace('0x', '');
+    const ih      = ilkData.replace('0x', '');
     const rateBig = BigInt('0x' + ih.slice(64, 128));
     const spotBig = BigInt('0x' + ih.slice(128, 192));
     const inkEth  = Number(inkBig) / 1e18;
@@ -145,33 +153,37 @@ async function fetchMaker(address, ethPriceUsd, rpcUrl) {
 
 async function walletMonitorHandler(req, res) {
   const { address } = req.query;
-  if (!address) return res.status(400).json({ error: 'Required: ?address=0x… (EVM wallet address)' });
-
-  const { isAddress } = await import('viem');
-  if (!isAddress(address)) return res.status(400).json({ error: 'Invalid EVM address' });
+  if (!address)              return res.status(400).json({ error: 'Required: ?address=0x… (EVM wallet address)' });
+  if (!isValidAddress(address)) return res.status(400).json({ error: 'Invalid EVM address' });
 
   const rpcUrl = getRpcUrl();
 
-  const [ethPrice, aave, compound] = await Promise.all([
-    fetchEthPrice(rpcUrl),
-    fetchAave(address, rpcUrl),
-    fetchCompound(address, rpcUrl),
-  ]);
+  try {
+    // ETH price is a single fast call; fetch it first so fetchMaker can run in
+    // parallel with Aave/Compound rather than waiting for a second serial batch.
+    const ethPrice = await fetchEthPrice(rpcUrl).catch(() => null);
 
-  const maker = await fetchMaker(address, ethPrice, rpcUrl);
+    const [aave, compound, maker] = await Promise.all([
+      fetchAave(address, rpcUrl).catch(() => null),
+      fetchCompound(address, rpcUrl).catch(() => null),
+      fetchMaker(address, ethPrice, rpcUrl).catch(() => null),
+    ]);
 
-  const positions = [aave, compound, maker].filter(Boolean);
-  const worstHf   = positions.length > 0 ? Math.min(...positions.map((p) => p.healthFactor)) : null;
+    const positions = [aave, compound, maker].filter(Boolean);
+    const worstHf   = positions.length > 0 ? Math.min(...positions.map((p) => p.healthFactor)) : null;
 
-  res.json({
-    fetchedAt:       new Date().toISOString(),
-    address,
-    chain:           'ethereum',
-    ethPriceUsd:     ethPrice,
-    overallRisk:     worstHf != null ? riskLevel(worstHf) : 'NO_POSITIONS',
-    worstHealthFactor: worstHf,
-    positions,
-  });
+    res.json({
+      fetchedAt:         new Date().toISOString(),
+      address,
+      chain:             'ethereum',
+      ethPriceUsd:       ethPrice,
+      overallRisk:       worstHf != null ? riskLevel(worstHf) : 'NO_POSITIONS',
+      worstHealthFactor: worstHf,
+      positions,
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch positions', detail: err.message });
+  }
 }
 
 module.exports = walletMonitorHandler;
