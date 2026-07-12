@@ -52,6 +52,7 @@ function whaleScore(whaleData) {
 }
 
 async function earlyWarningHandler(req, res) {
+  try {
   const [
     velocityUsdc,
     velocityUsdt,
@@ -123,6 +124,9 @@ async function earlyWarningHandler(req, res) {
       whales:          whaleData       ? { source: whaleData.source, count: (whaleData.transfers || whaleData.movers || []).length } : null,
     },
   });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to compute early warning score', detail: err.message });
+  }
 }
 
 module.exports = earlyWarningHandler;

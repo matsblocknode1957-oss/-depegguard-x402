@@ -9,6 +9,10 @@ const MAKER_GET_CDPS    = '0x36a724Bd100c39f0Ea4D3A20F7097eE01a8fF573';
 const CHAINLINK_ETH_USD = '0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419';
 const ZERO_ADDR = '0x' + '0'.repeat(40);
 
+function isValidAddress(addr) {
+  return typeof addr === 'string' && /^0x[0-9a-fA-F]{40}$/i.test(addr);
+}
+
 // Compound v3 WETH liquidation factor (from Compound governance)
 const COMPOUND_WETH_LIQ_FACTOR = 0.90;
 
@@ -120,12 +124,14 @@ async function makerLiquidationPrice(address, ethPriceUsd, rpcUrl) {
   const proxyAddr = proxyRaw && proxyRaw !== '0x' ? '0x' + proxyRaw.slice(-40) : null;
   const candidates = [...new Set([proxyAddr, address].filter((a) => a && a !== ZERO_ADDR))];
 
-  let cdpsRaw = null;
-  for (const addr of candidates) {
-    const padded = addr.replace('0x', '').padStart(64, '0');
-    const r = await rpcCall(MAKER_GET_CDPS, '0x1ce03f38' + paddedManager + padded, rpcUrl);
-    if (r && r !== '0x' && r.length > 2) { cdpsRaw = r; break; }
-  }
+  const cdpResults = await Promise.all(
+    candidates.map((addr) => {
+      const padded = addr.replace('0x', '').padStart(64, '0');
+      return rpcCall(MAKER_GET_CDPS, '0x1ce03f38' + paddedManager + padded, rpcUrl)
+        .catch(() => null);
+    })
+  );
+  const cdpsRaw = cdpResults.find((r) => r && r !== '0x' && r.length > 2) ?? null;
   if (!cdpsRaw) return null;
 
   const hex   = cdpsRaw.replace('0x', '');
@@ -196,33 +202,36 @@ async function makerLiquidationPrice(address, ethPriceUsd, rpcUrl) {
 
 async function liquidationPriceHandler(req, res) {
   const { address } = req.query;
-  if (!address) return res.status(400).json({ error: 'Required: ?address=0x… (EVM wallet address)' });
+  if (!address)              return res.status(400).json({ error: 'Required: ?address=0x… (EVM wallet address)' });
+  if (!isValidAddress(address)) return res.status(400).json({ error: 'Invalid EVM address' });
 
-  const { isAddress } = await import('viem');
-  if (!isAddress(address)) return res.status(400).json({ error: 'Invalid EVM address' });
+  const rpcUrl = getRpcUrl();
 
-  const rpcUrl    = getRpcUrl();
-  const ethPrice  = await fetchEthPrice(rpcUrl);
+  try {
+    const ethPrice = await fetchEthPrice(rpcUrl).catch(() => null);
 
-  const [aave, compound, maker] = await Promise.all([
-    aaveLiquidationPrice(address, ethPrice, rpcUrl),
-    compoundLiquidationPrice(address, ethPrice, rpcUrl),
-    makerLiquidationPrice(address, ethPrice, rpcUrl),
-  ]);
+    const [aave, compound, maker] = await Promise.all([
+      aaveLiquidationPrice(address, ethPrice, rpcUrl).catch(() => null),
+      compoundLiquidationPrice(address, ethPrice, rpcUrl).catch(() => null),
+      makerLiquidationPrice(address, ethPrice, rpcUrl).catch(() => null),
+    ]);
 
-  const positions = [aave, compound, maker].filter(Boolean);
-  const highest   = positions.length > 0
-    ? positions.reduce((a, b) => (a.liquidationPriceUsd ?? 0) > (b.liquidationPriceUsd ?? 0) ? a : b)
-    : null;
+    const positions = [aave, compound, maker].filter(Boolean);
+    const highest   = positions.length > 0
+      ? positions.reduce((a, b) => (a.liquidationPriceUsd ?? 0) > (b.liquidationPriceUsd ?? 0) ? a : b)
+      : null;
 
-  res.json({
-    fetchedAt:       new Date().toISOString(),
-    address,
-    currentEthPrice: ethPrice,
-    mostAtRisk:      highest ? { protocol: highest.protocol, liquidationPriceUsd: highest.liquidationPriceUsd, safetyBuffer: highest.safetyBuffer } : null,
-    positions,
-    note: 'Liquidation prices assume ETH-denominated collateral. Mixed collateral positions may differ.',
-  });
+    res.json({
+      fetchedAt:       new Date().toISOString(),
+      address,
+      currentEthPrice: ethPrice,
+      mostAtRisk:      highest ? { protocol: highest.protocol, liquidationPriceUsd: highest.liquidationPriceUsd, safetyBuffer: highest.safetyBuffer } : null,
+      positions,
+      note: 'Liquidation prices assume ETH-denominated collateral. Mixed collateral positions may differ.',
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch liquidation prices', detail: err.message });
+  }
 }
 
 module.exports = liquidationPriceHandler;

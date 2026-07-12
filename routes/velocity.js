@@ -34,46 +34,50 @@ async function velocityHandler(req, res) {
     return res.status(400).json({ error: `Unsupported coin. Supported: ${SUPPORTED.join(', ')}` });
   }
 
-  const apiRes = await fetch(`https://stablecoins.llama.fi/stablecoin/${id}`, {
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!apiRes.ok) throw new Error(`DeFi Llama stablecoin API returned ${apiRes.status}`);
+  try {
+    const apiRes = await fetch(`https://stablecoins.llama.fi/stablecoin/${id}`, {
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!apiRes.ok) return res.status(502).json({ error: `DeFi Llama stablecoin API returned ${apiRes.status}` });
 
-  const data = await apiRes.json();
+    const data = await apiRes.json();
 
-  // totalCirculating array: [{ date (unix), totalCirculating: { peggedUSD } }]
-  const raw = (data.totalCirculating || data.tokens || [])
-    .filter((e) => e.totalCirculating?.peggedUSD != null || e.circulating?.peggedUSD != null)
-    .map((e) => ({
-      date:   new Date(e.date * 1000).toISOString().slice(0, 10),
-      supplyUsd: Math.round(e.totalCirculating?.peggedUSD ?? e.circulating?.peggedUSD ?? 0),
-    }))
-    .filter((e) => e.supplyUsd > 0);
+    // totalCirculating array: [{ date (unix), totalCirculating: { peggedUSD } }]
+    const raw = (data.totalCirculating || data.tokens || [])
+      .filter((e) => e.totalCirculating?.peggedUSD != null || e.circulating?.peggedUSD != null)
+      .map((e) => ({
+        date:   new Date(e.date * 1000).toISOString().slice(0, 10),
+        supplyUsd: Math.round(e.totalCirculating?.peggedUSD ?? e.circulating?.peggedUSD ?? 0),
+      }))
+      .filter((e) => e.supplyUsd > 0);
 
-  const slice     = raw.slice(-days);
-  const startEntry = slice[0];
-  const endEntry   = slice[slice.length - 1];
+    const slice     = raw.slice(-days);
+    const startEntry = slice[0];
+    const endEntry   = slice[slice.length - 1];
 
-  if (!startEntry || !endEntry) throw new Error('Insufficient supply history from DeFi Llama');
+    if (!startEntry || !endEntry) return res.status(502).json({ error: 'Insufficient supply history from DeFi Llama' });
 
-  const changeUsd  = endEntry.supplyUsd - startEntry.supplyUsd;
-  const changePct  = Math.round((changeUsd / startEntry.supplyUsd) * 10000) / 100;
-  const dailyChangePct = Math.round((changePct / days) * 100) / 100;
-  const { signal, note } = velocitySignal(changePct);
+    const changeUsd  = endEntry.supplyUsd - startEntry.supplyUsd;
+    const changePct  = Math.round((changeUsd / startEntry.supplyUsd) * 10000) / 100;
+    const dailyChangePct = Math.round((changePct / days) * 100) / 100;
+    const { signal, note } = velocitySignal(changePct);
 
-  res.json({
-    fetchedAt:        new Date().toISOString(),
-    coin,
-    days,
-    currentSupplyUsd: endEntry.supplyUsd,
-    supplyAtStart:    startEntry.supplyUsd,
-    changeUsd:        Math.round(changeUsd),
-    changePct,
-    dailyChangePct,
-    velocitySignal:   signal,
-    note,
-    history: slice,
-  });
+    res.json({
+      fetchedAt:        new Date().toISOString(),
+      coin,
+      days,
+      currentSupplyUsd: endEntry.supplyUsd,
+      supplyAtStart:    startEntry.supplyUsd,
+      changeUsd:        Math.round(changeUsd),
+      changePct,
+      dailyChangePct,
+      velocitySignal:   signal,
+      note,
+      history: slice,
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch velocity data', detail: err.message });
+  }
 }
 
 module.exports = velocityHandler;

@@ -2,6 +2,10 @@
 
 const SUBGRAPH_ID = '5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV';
 
+function isValidAddress(addr) {
+  return typeof addr === 'string' && /^0x[0-9a-fA-F]{40}$/i.test(addr);
+}
+
 const GRAPH_ENDPOINT = process.env.GRAPH_API_KEY
   ? `https://gateway.thegraph.com/api/${process.env.GRAPH_API_KEY}/subgraphs/id/${SUBGRAPH_ID}`
   : `https://gateway.thegraph.com/api/subgraphs/id/${SUBGRAPH_ID}`;
@@ -90,28 +94,32 @@ async function uniswapPoolHandler(req, res) {
   }
 
   if (pool) {
-    const { isAddress } = await import('viem');
-    if (!isAddress(pool)) return res.status(400).json({ error: 'Invalid pool address' });
-
-    const data = await graphql(QUERY_BY_ID, { id: pool.toLowerCase() });
-    if (!data.pool) return res.status(404).json({ error: `Pool ${pool} not found in subgraph` });
-
-    return res.json({ fetchedAt: new Date().toISOString(), ...formatPool(data.pool) });
+    if (!isValidAddress(pool)) return res.status(400).json({ error: 'Invalid pool address' });
   }
 
-  // Token + fee mode
-  const feeInt = parseInt(fee, 10);
-  if (isNaN(feeInt)) return res.status(400).json({ error: 'fee must be a number (e.g. 500, 3000, 10000)' });
+  try {
+    if (pool) {
+      const data = await graphql(QUERY_BY_ID, { id: pool.toLowerCase() });
+      if (!data.pool) return res.status(404).json({ error: `Pool ${pool} not found in subgraph` });
+      return res.json({ fetchedAt: new Date().toISOString(), ...formatPool(data.pool) });
+    }
 
-  const t0 = normaliseSymbol(token0);
-  const t1 = normaliseSymbol(token1);
+    // Token + fee mode
+    const feeInt = parseInt(fee, 10);
+    if (isNaN(feeInt)) return res.status(400).json({ error: 'fee must be a number (e.g. 500, 3000, 10000)' });
 
-  const data = await graphql(QUERY_BY_TOKENS, { t0, t1, fee: String(feeInt) });
-  if (!data.pools?.length) {
-    return res.status(404).json({ error: `No pool found for ${t0}/${t1} fee=${feeInt}` });
+    const t0 = normaliseSymbol(token0);
+    const t1 = normaliseSymbol(token1);
+
+    const data = await graphql(QUERY_BY_TOKENS, { t0, t1, fee: String(feeInt) });
+    if (!data.pools?.length) {
+      return res.status(404).json({ error: `No pool found for ${t0}/${t1} fee=${feeInt}` });
+    }
+
+    return res.json({ fetchedAt: new Date().toISOString(), ...formatPool(data.pools[0]) });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch pool data', detail: err.message });
   }
-
-  return res.json({ fetchedAt: new Date().toISOString(), ...formatPool(data.pools[0]) });
 }
 
 module.exports = uniswapPoolHandler;
