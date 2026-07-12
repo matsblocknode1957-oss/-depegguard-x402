@@ -73,7 +73,7 @@ async function velocityHandler(req, res) {
       dailyChangePct,
       velocitySignal:   signal,
       note,
-      history: slice,
+      history: Object.fromEntries(slice.map((e, i) => [String(i), e])),
     });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch velocity data', detail: err.message });

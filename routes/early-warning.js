@@ -113,7 +113,7 @@ async function earlyWarningHandler(req, res) {
     earlyWarningScore,
     alertLevel:        level,
     summary,
-    factors,
+    factors: Object.fromEntries(factors.map((f, i) => [String(i), f])),
     rawData: {
       correlatedRisk:  correlatedRisk  ? { composite: corrScore, riskLevel: correlatedRisk.riskLevel } : null,
       healthIndex:     healthIndex     ? { score: healthIndex.healthIndex, grade: healthIndex.grade }   : null,

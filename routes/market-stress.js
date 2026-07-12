@@ -15,8 +15,8 @@ async function marketStressHandler(req, res) {
       fetchedAt:          new Date().toISOString(),
       stress_level:       data.stress_level,
       stressed_coin_count: data.stressed_coin_count,
-      stressed_coins:     data.stressed_coins,
-      all_regimes:        data.all_regimes,
+      stressed_coins:     Object.fromEntries((data.stressed_coins || []).map((c, i) => [String(i), c])),
+      all_regimes:        Object.fromEntries((data.all_regimes   || []).map((r) => [r.slug, r])),
       timestamp:          data.timestamp,
     });
   } catch (err) {

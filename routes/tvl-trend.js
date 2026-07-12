@@ -53,7 +53,7 @@ async function tvlTrendHandler(req, res) {
       changePct,
       trend,
       slopeUsdMillionsPerDay: slope,
-      history: slice,
+      history: Object.fromEntries(slice.map((e, i) => [String(i), e])),
     });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch TVL trend data', detail: err.message });
