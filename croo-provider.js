@@ -50,11 +50,12 @@ const ID_TO_KEY_2 = {
 async function buildSignal() {
   const results = await Promise.all(COINS.map(fetchCoin));
   const signals = results.reduce((acc, r) => { acc[r.symbol] = r; return acc; }, {});
+  const toObj = (arr) => Object.fromEntries(arr.map((s, i) => [String(i), s]));
   const summary = {
-    EXIT:    results.filter((r) => r.signal === 'EXIT').map((r) => r.symbol),
-    HEDGE:   results.filter((r) => r.signal === 'HEDGE').map((r) => r.symbol),
-    STABLE:  results.filter((r) => r.signal === 'STABLE').map((r) => r.symbol),
-    UNKNOWN: results.filter((r) => r.signal === 'UNKNOWN').map((r) => r.symbol),
+    EXIT:    toObj(results.filter((r) => r.signal === 'EXIT').map((r) => r.symbol)),
+    HEDGE:   toObj(results.filter((r) => r.signal === 'HEDGE').map((r) => r.symbol)),
+    STABLE:  toObj(results.filter((r) => r.signal === 'STABLE').map((r) => r.symbol)),
+    UNKNOWN: toObj(results.filter((r) => r.signal === 'UNKNOWN').map((r) => r.symbol)),
   };
   return { fetchedAt: new Date().toISOString(), summary, signals };
 }
@@ -125,7 +126,7 @@ async function buildWhales() {
     return {
       fetchedAt: new Date().toISOString(),
       source: 'whale-alert',
-      transfers: (data.transactions || []).map((tx) => ({
+      transfers: Object.fromEntries((data.transactions || []).map((tx, i) => [String(i), {
         blockchain: tx.blockchain,
         from: tx.from?.address || tx.from?.owner_type || 'unknown',
         to: tx.to?.address || tx.to?.owner_type || 'unknown',
@@ -133,7 +134,7 @@ async function buildWhales() {
         symbol: tx.symbol?.toUpperCase(),
         timestamp: new Date(tx.timestamp * 1000).toISOString(),
         txHash: tx.hash,
-      })),
+      }])),
     };
   }
   const res = await fetch('https://stablecoins.llama.fi/stablecoins?includePrices=true', { signal: AbortSignal.timeout(10_000) });
@@ -152,7 +153,7 @@ async function buildWhales() {
     fetchedAt: new Date().toISOString(),
     source: 'defillama-flows',
     note: 'Set WHALE_ALERT_KEY for individual transfer data.',
-    movers,
+    movers: Object.fromEntries(movers.map((m, i) => [String(i), m])),
   };
 }
 
@@ -219,7 +220,7 @@ async function buildTvlRisk(opts) {
     fetchedAt: new Date().toISOString(), protocol: pd.name || protocol,
     tvlUsd: typeof tvlNow === 'number' ? tvlNow : null,
     change24hPct: change24hPct != null ? Math.round(change24hPct * 100) / 100 : null,
-    chainBreakdown: chains,
+    chainBreakdown: Object.fromEntries(chains.map((c) => [c.chain, c])),
   };
 }
 
@@ -231,7 +232,7 @@ async function buildCorrelatedRisk() {
   return {
     fetchedAt: new Date().toISOString(), composite: c, corrScore: data.corrScore,
     riskLevel: c >= 75 ? 'CRITICAL' : c >= 50 ? 'HIGH' : c >= 25 ? 'MODERATE' : 'LOW',
-    correlatedCoins: data.correlatedCoins || [], pegStress: data.pegStress,
+    correlatedCoins: Object.fromEntries((data.correlatedCoins || []).map((c, i) => [String(i), c])), pegStress: data.pegStress,
     liquidationStress: data.liquidationStress, flowPressure: data.flowPressure,
     perCoin: data.perCoin || {}, dataTimestamp: new Date(data.timestamp).toISOString(),
   };
@@ -345,7 +346,12 @@ async function buildStressTest(opts) {
     for (const [c, u] of Object.entries(portfolio)) { const p = s.prices[c] ?? 1; const st = u * p; sv += st; cb[c] = { holdingUsd: u, stressPrice: p, stressedUsd: Math.round(st * 100) / 100, lossUsd: Math.round((u - st) * 100) / 100, lossPct: Math.round((1 - p) * 10000) / 100 }; }
     return { scenarioId: s.id, name: s.name, description: s.description, portfolioLossUsd: Math.round((pv - sv) * 100) / 100, portfolioLossPct: Math.round(((pv - sv) / pv) * 10000) / 100, stressedValueUsd: Math.round(sv * 100) / 100, coinBreakdown: cb };
   }).sort((a, b) => b.portfolioLossUsd - a.portfolioLossUsd);
-  return { fetchedAt: new Date().toISOString(), portfolio, portfolioValueUsd: pv };
+  return {
+    fetchedAt: new Date().toISOString(),
+    portfolio,
+    portfolioValueUsd: pv,
+    scenarios: Object.fromEntries(scenarios.map((s) => [s.scenarioId, s])),
+  };
 }
 
 async function buildWalletMonitor(opts) {
@@ -418,7 +424,7 @@ async function buildProtocolRisk(opts) {
   const composite = Math.round(tvlScore * 0.25 + liq * 0.35 + peg * 0.25 + depeg * 0.15);
   const grade = composite <= 10 ? 'A+' : composite <= 20 ? 'A' : composite <= 35 ? 'B' : composite <= 50 ? 'C' : composite <= 65 ? 'D' : 'F';
   const rl = composite >= 75 ? 'CRITICAL' : composite >= 50 ? 'HIGH' : composite >= 25 ? 'MODERATE' : 'LOW';
-  return { fetchedAt: new Date().toISOString(), protocol: pd.name || protocol, riskScore: composite, riskLevel: rl, grade, components: { tvlRisk: { score: Math.round(tvlScore), weight: '25%', tvlUsd: typeof tvlNow === 'number' ? tvlNow : null, change24hPct: Math.round(chg24 * 100) / 100 }, liquidationStress: { score: liq, weight: '35%' }, pegStress: { score: peg, weight: '25%' }, depegSignals: { score: depeg, weight: '15%', exitCoins: pegResults.filter((r) => r.signal === 'EXIT').map((r) => r.symbol), hedgeCoins: pegResults.filter((r) => r.signal === 'HEDGE').map((r) => r.symbol) } } };
+  return { fetchedAt: new Date().toISOString(), protocol: pd.name || protocol, riskScore: composite, riskLevel: rl, grade, components: { tvlRisk: { score: Math.round(tvlScore), weight: '25%', tvlUsd: typeof tvlNow === 'number' ? tvlNow : null, change24hPct: Math.round(chg24 * 100) / 100 }, liquidationStress: { score: liq, weight: '35%' }, pegStress: { score: peg, weight: '25%' }, depegSignals: { score: depeg, weight: '15%', exitCoins: Object.fromEntries(pegResults.filter((r) => r.signal === 'EXIT').map((r, i) => [String(i), r.symbol])), hedgeCoins: Object.fromEntries(pegResults.filter((r) => r.signal === 'HEDGE').map((r, i) => [String(i), r.symbol])) } } };
 }
 
 // Generic adapter: call a route handler with a mock req/res and capture the JSON payload
