@@ -43,8 +43,14 @@ function crossChainScore(deviation) {
   return Math.min(100, Math.round((deviation.maxDeviationPct ?? 0) * 200));
 }
 
+function whaleItemCount(whaleData) {
+  const v = whaleData?.transfers || whaleData?.movers;
+  if (!v) return 0;
+  return Array.isArray(v) ? v.length : Object.keys(v).length;
+}
+
 function whaleScore(whaleData) {
-  const items = (whaleData?.transfers || whaleData?.movers || []).length;
+  const items = whaleItemCount(whaleData);
   if (items > 10) return 80;
   if (items > 5)  return 40;
   if (items > 0)  return 20;
@@ -100,7 +106,7 @@ async function earlyWarningHandler(req, res) {
     { factor: `Velocity (worst: ${velUsdcScore >= velUsdtScore ? 'USDC' : 'USDT'})`, signal: (velUsdcScore >= velUsdtScore ? velocityUsdc : velocityUsdt)?.velocitySignal ?? 'UNKNOWN', rawScore: worstVel, weight: '20%', contribution: Math.round(worstVel * 0.20) },
     { factor: 'Fear & Greed index',             signal: fearGreed?.classification ?? 'UNKNOWN',  rawScore: fngS,       weight: '15%', contribution: Math.round(fngS       * 0.15) },
     { factor: 'Cross-chain deviation (USDC)',   signal: crossChain?.status ?? 'UNKNOWN',         rawScore: crossS,     weight: '10%', contribution: Math.round(crossS     * 0.10) },
-    { factor: 'Whale activity',                 signal: `${(whaleData?.transfers || whaleData?.movers || []).length} transfers`, rawScore: whaleS, weight: '5%', contribution: Math.round(whaleS * 0.05) },
+    { factor: 'Whale activity',                 signal: `${whaleItemCount(whaleData)} transfers`, rawScore: whaleS, weight: '5%', contribution: Math.round(whaleS * 0.05) },
   ].sort((a, b) => b.contribution - a.contribution);
 
   const topFactors = factors.filter((f) => f.contribution > 0).slice(0, 3);
@@ -121,7 +127,7 @@ async function earlyWarningHandler(req, res) {
       velocityUsdt:    velocityUsdt    ? { signal: velocityUsdt.velocitySignal, changePct: velocityUsdt.changePct } : null,
       fearGreed:       fearGreed       ? { value: fearGreed.value, classification: fearGreed.classification }       : null,
       crossChainDepeg: crossChain      ? { status: crossChain.status, maxDeviationPct: crossChain.maxDeviationPct } : null,
-      whales:          whaleData       ? { source: whaleData.source, count: (whaleData.transfers || whaleData.movers || []).length } : null,
+      whales:          whaleData       ? { source: whaleData.source, count: whaleItemCount(whaleData) } : null,
     },
   });
   } catch (err) {
