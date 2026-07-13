@@ -19,7 +19,7 @@ const PAID_ENDPOINTS = [
     params: [],
     responseSchema: {
       fetchedAt: 'ISO-8601 timestamp',
-      summary: { EXIT: 'array', HEDGE: 'array', STABLE: 'array', UNKNOWN: 'array' },
+      summary: { EXIT: 'object — numeric-keyed coin symbols', HEDGE: 'object — numeric-keyed coin symbols', STABLE: 'object — numeric-keyed coin symbols', UNKNOWN: 'object — numeric-keyed coin symbols' },
       signals: { '[SYMBOL]': { signal: 'EXIT|HEDGE|STABLE|UNKNOWN', price: 'number', pegDeviation: 'number%' } },
     },
   },
@@ -65,7 +65,7 @@ const PAID_ENDPOINTS = [
     ],
     responseSchema: {
       fetchedAt: 'ISO-8601 timestamp', coin: 'string', days: 'number',
-      history: 'array of PegCheck history objects',
+      history: 'object — numeric-keyed history entries',
     },
   },
   {
@@ -75,7 +75,7 @@ const PAID_ENDPOINTS = [
     params: [],
     responseSchema: {
       fetchedAt: 'ISO-8601 timestamp', source: 'whale-alert|defillama-flows',
-      transfers: 'array (with WHALE_ALERT_KEY) or movers array (fallback)',
+      transfers: 'object — numeric-keyed transfers (with WHALE_ALERT_KEY) or movers object (fallback)',
     },
   },
   {
@@ -112,7 +112,7 @@ const PAID_ENDPOINTS = [
     responseSchema: {
       fetchedAt: 'ISO-8601 timestamp',
       tvlUsd: 'number', change24hPct: 'number', riskLevel: 'HIGH|MODERATE|LOW',
-      chainBreakdown: 'array of { chain, tvlUsd }',
+      chainBreakdown: 'object — keyed by chain name, values { chain, tvlUsd }',
     },
   },
   {
@@ -124,7 +124,7 @@ const PAID_ENDPOINTS = [
       fetchedAt: 'ISO-8601 timestamp',
       composite: 'number 0–100', corrScore: 'number',
       riskLevel: 'CRITICAL|HIGH|MODERATE|LOW',
-      correlatedCoins: 'array of symbol strings',
+      correlatedCoins: 'object — numeric-keyed coin symbols',
       perCoin: 'object — individual risk scores',
       pegStress: 'number', liquidationStress: 'number', flowPressure: 'number',
     },
@@ -137,7 +137,7 @@ const PAID_ENDPOINTS = [
     responseSchema: {
       fetchedAt: 'ISO-8601 timestamp',
       topYield: 'object — highest APY pool', bestByProject: 'object — best per protocol',
-      allPools: 'array of up to 30 stablecoin pools sorted by APY',
+      allPools: 'object — numeric-keyed, up to 30 pools sorted by APY',
     },
   },
   {
@@ -147,7 +147,7 @@ const PAID_ENDPOINTS = [
     params: [],
     responseSchema: {
       fetchedAt: 'ISO-8601 timestamp',
-      count: 'number', filings: 'array of { filedAt, formType, company, description, period, url }',
+      count: 'number', filings: 'object — numeric-keyed { filedAt, formType, company, description }',
     },
   },
   {
@@ -184,8 +184,7 @@ const PAID_ENDPOINTS = [
     responseSchema: {
       fetchedAt: 'ISO-8601 timestamp',
       portfolioValueUsd: 'number',
-      worstScenario: '{ name, lossUsd, lossPct }',
-      scenarios: 'array — per-scenario breakdown with coinBreakdown',
+      scenarios: 'object — keyed by scenarioId, values { name, description, portfolioLossUsd, portfolioLossPct, stressedValueUsd, coinBreakdown }',
     },
   },
   {
@@ -198,7 +197,7 @@ const PAID_ENDPOINTS = [
       address: 'string', ethPriceUsd: 'number',
       overallRisk: 'SAFE|MODERATE|ELEVATED|CRITICAL|LIQUIDATABLE|NO_POSITIONS',
       worstHealthFactor: 'number',
-      positions: 'array of { protocol, healthFactor, collateralUsd, debtUsd, riskLevel }',
+      positions: 'object — keyed by protocol name, values { protocol, healthFactor, collateralUsd, debtUsd, riskLevel }',
     },
   },
   {
@@ -208,7 +207,7 @@ const PAID_ENDPOINTS = [
     params: [],
     responseSchema: {
       fetchedAt: 'ISO-8601 timestamp',
-      networks: 'array of { network, baseFeeGwei, priorityFeeGwei, totalGwei, estimatedUsdcTransferCostUsd }',
+      networks: 'object — keyed by network name (base, ethereum), values { network, baseFeeGwei, priorityFeeGwei }',
     },
   },
   {
@@ -220,7 +219,7 @@ const PAID_ENDPOINTS = [
       fetchedAt: 'ISO-8601 timestamp',
       stablecoinMarketCapUsd: 'number', totalCryptoMarketCapUsd: 'number',
       dominancePct: 'number', change24hPct: 'number',
-      trend: 'EXPANDING|CONTRACTING|STABLE', topStablecoins: 'array of { symbol, marketCapUsd, sharePct }',
+      trend: 'EXPANDING|CONTRACTING|STABLE', topStablecoins: 'object — keyed by coin symbol, values { marketCapUsd, sharePct }',
     },
   },
   {
@@ -243,7 +242,7 @@ const PAID_ENDPOINTS = [
       fetchedAt: 'ISO-8601 timestamp',
       coin: 'string', status: 'STABLE|DEPEGGED',
       maxDeviationPct: 'number',
-      chains: 'array of { chain, price, updatedAt, deviation }',
+      chains: 'object — keyed by chain name (ethereum, base, arbitrum), values { chain, price, updatedAt, deviation }',
     },
   },
   {
@@ -254,7 +253,7 @@ const PAID_ENDPOINTS = [
     responseSchema: {
       fetchedAt: 'ISO-8601 timestamp',
       protocols: 'object keyed by protocol slug',
-      ranking: 'array — protocols ordered safest to riskiest',
+      ranking: 'object — numeric-keyed protocol names, safest to riskiest',
       safest: 'string', riskiest: 'string',
       systemWide: '{ liquidationStress, pegStress }',
     },
@@ -268,7 +267,7 @@ const PAID_ENDPOINTS = [
       fetchedAt: 'ISO-8601 timestamp',
       currentEthPrice: 'number',
       mostAtRisk: '{ protocol, liquidationPriceUsd, safetyBuffer }',
-      positions: 'array of { protocol, healthFactor, liquidationPriceUsd, safetyBuffer }',
+      positions: 'object — keyed by protocol name, values { protocol, healthFactor, liquidationPriceUsd, safetyBuffer }',
     },
   },
   {
@@ -284,7 +283,7 @@ const PAID_ENDPOINTS = [
       protocol: 'string', days: 'number',
       startTvlUsd: 'number', endTvlUsd: 'number', changePct: 'number',
       trend: 'GROWING|DECLINING|FLAT|UNKNOWN',
-      slopeUsdMillionsPerDay: 'number', history: 'array of { date, tvlUsd }',
+      slopeUsdMillionsPerDay: 'number', history: 'object — numeric-keyed { date, tvlUsd }',
     },
   },
   {
@@ -311,7 +310,7 @@ const PAID_ENDPOINTS = [
       fetchedAt: 'ISO-8601 timestamp',
       coin: 'string', currentSupplyUsd: 'number', changePct: 'number', dailyChangePct: 'number',
       velocitySignal: 'RAPID_EXPANSION|EXPANDING|STABLE|CONTRACTING|RAPID_CONTRACTION',
-      note: 'string', history: 'array of { date, supplyUsd }',
+      note: 'string', history: 'object — numeric-keyed { date, supplyUsd }',
     },
   },
   {
@@ -323,7 +322,7 @@ const PAID_ENDPOINTS = [
       fetchedAt: 'ISO-8601 timestamp',
       portfolioRiskScore: 'number 0–100', riskLevel: 'CRITICAL|HIGH|MODERATE|LOW',
       worstAddress: 'string',
-      wallets: 'array of { address, overallRisk, worstHealthFactor, liquidationPrices, positions }',
+      wallets: 'object — keyed by address, values { overallRisk, worstHealthFactor, positionRiskScore, liquidationPrices, positions (object keyed by protocol) }',
       systemRisk: '{ score, correlatedRisk, fearGreedValue, healthIndex, crossChainDeviation, whaleTransferCount }',
     },
   },
@@ -336,7 +335,7 @@ const PAID_ENDPOINTS = [
       fetchedAt: 'ISO-8601 timestamp',
       earlyWarningScore: 'number 0–100',
       alertLevel: 'GREEN|YELLOW|ORANGE|RED',
-      summary: 'string', factors: 'array of { factor, signal, rawScore, weight, contribution }',
+      summary: 'string', factors: 'object — numeric-keyed { factor, signal, rawScore, weight, contribution }',
       rawData: 'object — source data from each contributing signal',
     },
   },
