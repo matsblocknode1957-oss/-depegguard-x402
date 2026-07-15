@@ -44,6 +44,7 @@ function riskLevel(score) {
 }
 
 async function protocolComparisonHandler(req, res) {
+  try {
   const [tvlResults, ftRes] = await Promise.all([
     Promise.all(PROTOCOLS.map((p) => fetchTvlData(p.key))),
     fetch(`${FINTECHCHECK}/api/risk`, { signal: AbortSignal.timeout(8_000) }),
@@ -82,6 +83,9 @@ async function protocolComparisonHandler(req, res) {
     riskiest:   ranked[ranked.length - 1].protocol,
     systemWide: { liquidationStress: liqStress, pegStress },
   });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to compare protocols', detail: err.message });
+  }
 }
 
 module.exports = protocolComparisonHandler;

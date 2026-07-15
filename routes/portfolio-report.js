@@ -61,17 +61,18 @@ async function portfolioReportHandler(req, res) {
     return res.status(400).json({ error: 'No valid EVM addresses provided' });
   }
 
+  try {
   const h = handlers();
 
   // Run all fetches in parallel: per-address + system-wide
   const [walletResults, liqResults, systemResults] = await Promise.all([
     // Per-address wallet positions
     Promise.all(addresses.map((address) =>
-      callRoute(h.walletMonitor, { address }).catch((err) => ({ address, error: err.message, positions: [] }))
+      callRoute(h.walletMonitor, { address }).catch((err) => ({ address, error: err.message, positions: {} }))
     )),
     // Per-address liquidation prices
     Promise.all(addresses.map((address) =>
-      callRoute(h.liquidationPrice, { address }).catch((err) => ({ address, error: err.message, positions: [] }))
+      callRoute(h.liquidationPrice, { address }).catch((err) => ({ address, error: err.message, positions: {} }))
     )),
     // System-wide signals
     Promise.allSettled([
@@ -96,7 +97,7 @@ async function portfolioReportHandler(req, res) {
 
     // Extract liquidation prices keyed by protocol
     const liquidationPrices = {};
-    for (const p of (liq.positions || [])) {
+    for (const p of Object.values(liq.positions || {})) {
       if (p.liquidationPriceUsd) liquidationPrices[p.protocol] = p.liquidationPriceUsd;
     }
 
@@ -107,7 +108,7 @@ async function portfolioReportHandler(req, res) {
       positionRiskScore:  positionRisk,
       liquidationPrices,
       mostAtRisk:         liq.mostAtRisk ?? null,
-      positions:          Object.fromEntries((monitor.positions ?? []).map((p) => [p.protocol, p])),
+      positions:          monitor.positions ?? {},
       error:              monitor.error ?? liq.error ?? null,
     };
   });
@@ -117,7 +118,8 @@ async function portfolioReportHandler(req, res) {
   const fearGreedVal    = fngResult?.value            ?? 50;
   const healthIndexVal  = hiResult?.healthIndex       ?? 50;
   const crossChainDev   = ccdResult?.status           ?? 'UNKNOWN';
-  const whaleCount      = (whaleResult?.transfers || whaleResult?.movers || []).length;
+  const whaleV          = whaleResult?.transfers || whaleResult?.movers;
+  const whaleCount      = !whaleV ? 0 : Array.isArray(whaleV) ? whaleV.length : Object.keys(whaleV).length;
 
   const fearRisk   = fearGreedVal < 25 ? 80 : fearGreedVal < 40 ? 50 : fearGreedVal < 60 ? 20 : 0;
   const healthRisk = Math.max(0, 100 - healthIndexVal);
@@ -159,6 +161,9 @@ async function portfolioReportHandler(req, res) {
       whaleTransferCount: whaleCount,
     },
   });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to generate portfolio report', detail: err.message });
+  }
 }
 
 module.exports = portfolioReportHandler;
