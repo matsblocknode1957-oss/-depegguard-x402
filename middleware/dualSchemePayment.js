@@ -27,27 +27,27 @@ function toBase64(obj) {
  *   recipientAddress, usdcContract, serverUrl, facilitatorUrl, rpcUrl,
  *   resourcePath,   // e.g. '/api/signal'
  *   amountMicro,    // USDC in base units (6 decimals), e.g. '1000' = $0.001
- *   description,
+ *   description,    // human-readable description (becomes serviceName on Bazaar)
+ *   tags,           // string[] — up to 5, 32 chars each, for Bazaar discovery
+ *   queryParams,    // JSON Schema properties object for query parameters (optional)
+ *   outputExample,  // representative example response object (optional)
  * }
  */
 function dualSchemePayment(config) {
   const resourceUrl = `${config.serverUrl}${config.resourcePath}`;
   const amountDecimal = String(parseInt(config.amountMicro, 10) / 1_000_000);
 
-  const bazaarExtension = {
-    name: config.description,
-    description: config.description,
-    version: '1.0.0',
-    schema: {
-      type: 'object',
-      properties: {
-        fetchedAt: { type: 'string' },
-        data:      { type: 'object' },
-      },
+  // Bazaar extension — spec-compliant: only `info` inside extensions.bazaar.
+  // serviceName and tags go at the resource level of the 402 body (see build402Body).
+  const bazaarInfo = {
+    input: {
+      type: 'http',
+      method: 'GET',
+      ...(config.queryParams ? { queryParams: config.queryParams } : {}),
     },
-    info: {
-      input:  { type: 'http', method: 'GET' },
-      output: { type: 'json' },
+    output: {
+      type: 'json',
+      ...(config.outputExample ? { example: config.outputExample } : {}),
     },
   };
 
@@ -77,9 +77,12 @@ function dualSchemePayment(config) {
     const { challenge } = await gate.challenge(resourceUrl);
     return {
       x402Version: 2,
-      resource: challenge.resource,
-      accepts:  [exactAccept, ...challenge.accepts],
-      extensions: { bazaar: bazaarExtension },
+      resource:    challenge.resource,
+      accepts:     [exactAccept, ...challenge.accepts],
+      // serviceName and tags at resource level per Bazaar spec
+      serviceName: config.description,
+      tags:        config.tags || [],
+      extensions:  { bazaar: { info: bazaarInfo } },
     };
   }
 
@@ -105,6 +108,10 @@ function dualSchemePayment(config) {
         extra: { name: 'USD Coin', version: '2' },
         resource: resourceUrl,
       },
+      // Include bazaar extension in the settlement POST so the Coinbase CDP
+      // facilitator can catalog this endpoint even when the paying client
+      // doesn't explicitly echo it.
+      extensions: { bazaar: { info: bazaarInfo } },
     };
 
     try {
