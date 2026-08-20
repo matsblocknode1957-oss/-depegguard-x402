@@ -10,6 +10,16 @@ const PORT = process.env.PORT || 3001;
 
 app.use(express.json());
 
+// CORS — needed for browser-based x402 clients and agentic wallets
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, payment-signature');
+  res.header('Access-Control-Expose-Headers', 'payment-required, payment-response');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
+  next();
+});
+
 // ── Free endpoints ────────────────────────────────────────────────────────────
 app.get('/', require('./routes/info'));
 app.get('/api/catalog', require('./routes/catalog'));

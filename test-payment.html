@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>DepegGuard x402 Test Payment</title>
+  <style>
+    body { font-family: monospace; max-width: 780px; margin: 40px auto; padding: 0 20px; background: #0f0f0f; color: #e0e0e0; }
+    h1 { color: #7fffb0; font-size: 1.2em; }
+    button { background: #7fffb0; color: #000; border: none; padding: 12px 28px; font-family: monospace; font-size: 1em; cursor: pointer; border-radius: 4px; }
+    button:disabled { opacity: 0.4; cursor: default; }
+    #log { margin-top: 24px; white-space: pre-wrap; background: #1a1a1a; padding: 16px; border-radius: 6px; border: 1px solid #333; min-height: 80px; font-size: 0.85em; line-height: 1.6; }
+    .ok  { color: #7fffb0; }
+    .err { color: #ff6b6b; }
+    .dim { color: #888; }
+  </style>
+</head>
+<body>
+<h1>DepegGuard x402 — test payment ($0.001 USDC on Base)</h1>
+<button id="btn">Connect Wallet &amp; Pay</button>
+
+<div id="log"></div>
+
+<script>
+const API_URL   = 'https://depegguard-x402-production.up.railway.app/api/signal';
+const BASE_USDC = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+const BASE_CID  = '0x2105'; // 8453
+
+const logEl = document.getElementById('log');
+function log(msg, cls) {
+  const span = document.createElement('span');
+  if (cls) span.className = cls;
+  span.textContent = msg + '\n';
+  logEl.appendChild(span);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+function toB64(obj) {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+}
+
+function rndBytes32() {
+  const b = new Uint8Array(32);
+  crypto.getRandomValues(b);
+  return '0x' + Array.from(b, x => x.toString(16).padStart(2, '0')).join('');
+}
+
+document.getElementById('btn').addEventListener('click', async () => {
+  document.getElementById('btn').disabled = true;
+  logEl.innerHTML = '';
+  try {
+    await run();
+  } catch (e) {
+    log('ERROR: ' + (e.message || String(e)), 'err');
+    console.error(e);
+  }
+  document.getElementById('btn').disabled = false;
+});
+
+async function run() {
+  // ── 1. Connect wallet ────────────────────────────────────────────────────────
+  if (!window.ethereum) throw new Error('No wallet extension detected. Install Coinbase Wallet in this browser.');
+  log('Connecting wallet…', 'dim');
+  const [address] = await window.ethereum.request({ method: 'eth_requestAccounts' });
+  log('Connected: ' + address, 'ok');
+
+  // ── 2. Ensure Base mainnet ───────────────────────────────────────────────────
+  const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+  if (chainId !== BASE_CID) {
+    log('Switching to Base mainnet…', 'dim');
+    try {
+      await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: BASE_CID }] });
+    } catch (err) {
+      if (err.code === 4902) {
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [{
+            chainId: BASE_CID,
+            chainName: 'Base',
+            nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+            rpcUrls: ['https://mainnet.base.org'],
+            blockExplorerUrls: ['https://basescan.org'],
+          }],
+        });
+      } else { throw err; }
+    }
+    log('Switched to Base.', 'ok');
+  } else {
+    log('Already on Base mainnet.', 'dim');
+  }
+
+  // ── 3. Initial GET → expect 402 ─────────────────────────────────────────────
+  log('\nGET ' + API_URL, 'dim');
+  let r1;
+  try {
+    r1 = await fetch(API_URL);
+  } catch (netErr) {
+    throw new Error(
+      'Network / CORS error — the Railway server may still be redeploying (wait ~60 s and retry).\n' +
+      'Raw: ' + netErr.message
+    );
+  }
+  log('HTTP ' + r1.status, r1.status === 402 ? 'ok' : 'err');
+
+  if (r1.status === 200) {
+    const d = await r1.json();
+    log('Server returned 200 without payment — possibly no payment gate on this deploy yet:\n' + JSON.stringify(d, null, 2));
+    return;
+  }
+  if (r1.status !== 402) {
+    const t = await r1.text();
+    throw new Error('Expected 402, got ' + r1.status + ': ' + t);
+  }
+
+  const body402 = await r1.json();
+  log('402 challenge received.', 'ok');
+
+  // ── 4. Extract exact-scheme requirements ─────────────────────────────────────
+  const req = (body402.accepts || []).find(a => a.scheme === 'exact');
+  if (!req) throw new Error('No exact scheme in accepts:\n' + JSON.stringify(body402, null, 2));
+
+  const { payTo, amount, maxTimeoutSeconds = 300, extra = {}, asset } = req;
+  log(`Paying: ${amount} µUSDC ($${(parseInt(amount,10)/1e6).toFixed(4)}) → ${payTo}`);
+
+  // ── 5. Sign EIP-3009 TransferWithAuthorization ───────────────────────────────
+  const nonce       = rndBytes32();
+  const validBefore = String(Math.floor(Date.now() / 1000) + maxTimeoutSeconds);
+
+  const typedData = {
+    types: {
+      EIP712Domain: [
+        { name: 'name',             type: 'string'  },
+        { name: 'version',          type: 'string'  },
+        { name: 'chainId',          type: 'uint256' },
+        { name: 'verifyingContract',type: 'address' },
+      ],
+      TransferWithAuthorization: [
+        { name: 'from',        type: 'address' },
+        { name: 'to',          type: 'address' },
+        { name: 'value',       type: 'uint256' },
+        { name: 'validAfter',  type: 'uint256' },
+        { name: 'validBefore', type: 'uint256' },
+        { name: 'nonce',       type: 'bytes32' },
+      ],
+    },
+    primaryType: 'TransferWithAuthorization',
+    domain: {
+      name:              extra.name    ?? 'USD Coin',
+      version:           extra.version ?? '2',
+      chainId:           8453,
+      verifyingContract: asset ?? BASE_USDC,
+    },
+    message: {
+      from:        address,
+      to:          payTo,
+      value:       amount,
+      validAfter:  '0',
+      validBefore,
+      nonce,
+    },
+  };
+
+  log('\nWaiting for wallet signature (approve in Coinbase Wallet)…', 'dim');
+  let signature;
+  try {
+    signature = await window.ethereum.request({
+      method: 'eth_signTypedData_v4',
+      params: [address, JSON.stringify(typedData)],
+    });
+  } catch (sigErr) {
+    if (sigErr.code === 4001) throw new Error('User rejected the signing request.');
+    throw sigErr;
+  }
+  log('Signed: ' + signature.slice(0, 22) + '…', 'ok');
+
+  // ── 6. Build x402 payment payload ────────────────────────────────────────────
+  const paymentObj = {
+    x402Version: 2,
+    scheme:      'exact',
+    network:     'eip155:8453',
+    payload: {
+      signature,
+      authorization: {
+        from:        address,
+        to:          payTo,
+        value:       amount,
+        validAfter:  '0',
+        validBefore,
+        nonce,
+      },
+    },
+  };
+  const paymentHeader = toB64(paymentObj);
+
+  // ── 7. Retry with payment ─────────────────────────────────────────────────────
+  log('\nRetrying GET with payment-signature header…', 'dim');
+  let r2;
+  try {
+    r2 = await fetch(API_URL, {
+      method: 'GET',
+      headers: { 'payment-signature': paymentHeader },
+    });
+  } catch (netErr) {
+    throw new Error('Network / CORS error on paid request: ' + netErr.message);
+  }
+  log('HTTP ' + r2.status, r2.ok ? 'ok' : 'err');
+
+  let data2;
+  try { data2 = await r2.json(); } catch { data2 = await r2.text(); }
+
+  if (r2.ok) {
+    log('\n✓ PAYMENT ACCEPTED — signal data:', 'ok');
+    log(JSON.stringify(data2, null, 2));
+    log('\nBazaar indexing event fired via Coinbase CDP facilitator.', 'ok');
+    log('Check agentic.market in a few minutes and report back.', 'dim');
+  } else {
+    log('\n✗ Payment rejected by facilitator:', 'err');
+    log(JSON.stringify(data2, null, 2));
+  }
+}
+</script>
+</body>
+</html>
